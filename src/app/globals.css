@@ -1,12 +1,24 @@
 @import "tailwindcss";
 
 :root {
+  /* Surface */
   --bg: #ffffff;
-  --card: #ffffff;
-  --border: #e5e5e5;
-  --text-primary: #1a1a1a;
-  --text-secondary: #555555;
-  --text-muted: #999999;
+  --surface: #f7f6f3;
+  --surface-hover: #f2f1ee;
+
+  /* Border */
+  --border: #e4e1da;
+  --border-subtle: #eceae5;
+
+  /* Text */
+  --text-primary: #1a1918;
+  --text-secondary: #58554f;
+  --text-muted: #97938c;
+  --text-faint: #c3bfb8;
+
+  /* Font stacks */
+  --font-body: var(--font-display), var(--font-sans), sans-serif;
+  --font-num: var(--font-display), sans-serif;
 }
 
 @layer base {
@@ -14,7 +26,6 @@
     box-sizing: border-box;
   }
 
-  /* 한국어 단어 단위 줄바꿈 — 음절 중간에서 안 잘리도록 전역 적용 */
   * {
     word-break: keep-all;
     overflow-wrap: break-word;
@@ -28,7 +39,9 @@
   body {
     background: var(--bg);
     color: var(--text-primary);
+    font-family: var(--font-body);
     font-size: 16px;
+    font-weight: 400;
     line-height: 1.65;
   }
 }

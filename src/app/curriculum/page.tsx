@@ -26,8 +26,8 @@ export default function CurriculumPage() {
     <div className="max-w-5xl mx-auto px-8">
 
       <section className="py-12">
-        <h1 className="text-[30px] font-bold text-[#1a1a1a] tracking-tight mb-2">커리큘럼</h1>
-        <p className="text-[15px] text-[#777]">{subjects.length}개 교과목 · {totalSessions}개 세션 · 총 {totalHours}h</p>
+        <h1 className="text-[30px] font-bold text-[#1a1918] tracking-tight mb-2">커리큘럼</h1>
+        <p className="text-[14px] text-[#97938c] font-light">{subjects.length}개 교과목 · {totalSessions}개 세션 · 총 {totalHours}h</p>
       </section>
 
       <div className="space-y-14 pb-20">
@@ -38,12 +38,12 @@ export default function CurriculumPage() {
 
           return (
             <section key={cat}>
-              <div className="flex items-end justify-between mb-5 pb-4 border-b border-[#e5e5e5]">
+              <div className="flex items-end justify-between mb-5 pb-4 border-b border-[#e4e1da]">
                 <div>
-                  <h2 className="text-[20px] font-bold text-[#1a1a1a] mb-1">{cat}</h2>
-                  <p className="text-[14px] text-[#777]">{categoryMeta[cat].desc}</p>
+                  <h2 className="text-[20px] font-bold text-[#1a1918] mb-1">{cat}</h2>
+                  <p className="text-[13px] text-[#97938c] font-light">{categoryMeta[cat].desc}</p>
                 </div>
-                <span className="text-[13px] text-[#aaa] tabular-nums flex-shrink-0 ml-4">{catHours}h</span>
+                <span className="text-[13px] text-[#c3bfb8] tabular-nums flex-shrink-0 ml-4 font-medium">{catHours}h</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -55,39 +55,39 @@ export default function CurriculumPage() {
                     <Link
                       key={subject.id}
                       href={`/curriculum/${subject.id}`}
-                      className="group flex flex-col bg-white border border-[#e5e5e5] rounded-xl overflow-hidden hover:border-[#1a1a1a] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all duration-150"
+                      className="group flex flex-col bg-white border border-[#e4e1da] rounded-xl overflow-hidden hover:border-[#1a1918] hover:shadow-[0_4px_24px_rgba(0,0,0,0.07)] transition-all duration-150"
                     >
                       {/* Card top */}
                       <div className="p-5 flex-1">
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-[11px] font-medium text-[#999] tracking-widest uppercase">
+                          <span className="text-[10px] font-medium text-[#c3bfb8] tracking-[0.14em] uppercase">
                             {subject.nodes.length > 1 ? `${subject.nodes.length}개 노드` : '단일 노드'}
                           </span>
-                          <span className="text-[13px] font-semibold text-[#333] tabular-nums">{subject.totalHours}h</span>
+                          <span className="text-[13px] font-bold text-[#58554f] tabular-nums">{subject.totalHours}h</span>
                         </div>
 
-                        <h3 className="text-[16px] font-semibold text-[#1a1a1a] leading-snug mb-4 group-hover:text-[#000]">
+                        <h3 className="text-[15px] font-semibold text-[#1a1918] leading-snug mb-4 group-hover:text-[#000]">
                           {subject.title}
                         </h3>
 
-                        {/* Node list (다중 노드인 경우) */}
+                        {/* 다중 노드 — 노드 목록 */}
                         {subject.nodes.length > 1 && (
                           <ul className="space-y-1.5 mb-4">
                             {subject.nodes.map((node, ni) => (
                               <li key={node.id} className="flex items-center justify-between gap-2">
                                 <span className="flex items-center gap-2 min-w-0">
-                                  <span className="text-[10px] text-[#ccc] font-mono tabular-nums flex-shrink-0">{String(ni + 1).padStart(2, '0')}</span>
-                                  <span className="text-[13px] text-[#555] truncate">{node.title}</span>
+                                  <span className="text-[10px] text-[#c3bfb8] tabular-nums flex-shrink-0">{String(ni + 1).padStart(2, '0')}</span>
+                                  <span className="text-[12px] text-[#7a776f] truncate font-light">{node.title}</span>
                                 </span>
-                                <span className="text-[12px] text-[#bbb] tabular-nums flex-shrink-0">{node.hours}h</span>
+                                <span className="text-[11px] text-[#c3bfb8] tabular-nums flex-shrink-0">{node.hours}h</span>
                               </li>
                             ))}
                           </ul>
                         )}
 
-                        {/* 단일 노드면 설명 한 줄 */}
+                        {/* 단일 노드 — 설명 */}
                         {subject.nodes.length === 1 && (
-                          <p className="text-[13px] text-[#666] leading-[1.7] mb-4">
+                          <p className="text-[12px] text-[#7a776f] leading-[1.75] mb-4 font-light">
                             {subject.nodes[0].description.slice(0, 72)}…
                           </p>
                         )}
@@ -95,7 +95,7 @@ export default function CurriculumPage() {
                         {/* Topics */}
                         <div className="flex flex-wrap gap-1.5">
                           {allTopics.map((t) => (
-                            <span key={t} className="text-[11px] text-[#666] bg-[#f5f5f5] border border-[#ebebeb] px-2 py-0.5 rounded-md">
+                            <span key={t} className="text-[11px] text-[#7a776f] bg-[#f7f6f3] border border-[#e4e1da] px-2 py-0.5 rounded-md">
                               {t}
                             </span>
                           ))}
@@ -103,9 +103,9 @@ export default function CurriculumPage() {
                       </div>
 
                       {/* Card footer */}
-                      <div className="flex items-center justify-between px-5 py-3 bg-[#fafafa] border-t border-[#f0f0f0]">
-                        <span className="text-[12px] text-[#aaa]">{sessions}개 세션</span>
-                        <span className="text-[12px] text-[#bbb] group-hover:text-[#555] transition-colors">보기 →</span>
+                      <div className="flex items-center justify-between px-5 py-3 bg-[#f7f6f3] border-t border-[#eceae5]">
+                        <span className="text-[11px] text-[#c3bfb8] font-medium">{sessions}개 세션</span>
+                        <span className="text-[12px] text-[#c3bfb8] group-hover:text-[#58554f] transition-colors">보기 →</span>
                       </div>
                     </Link>
                   );

@@ -1,11 +1,17 @@
 import type { Metadata } from 'next';
-import { Noto_Sans_KR } from 'next/font/google';
+import { Noto_Sans_KR, Jost } from 'next/font/google';
 import './globals.css';
 import Header from '@/components/Header';
 
-const notoSansKR = Noto_Sans_KR({
+const jost = Jost({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-display',
+});
+
+const notoSansKR = Noto_Sans_KR({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '700'],
   variable: '--font-sans',
 });
 
@@ -16,8 +22,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={notoSansKR.variable}>
-      <body className="font-[family-name:var(--font-sans)]">
+    <html lang="ko" className={`${jost.variable} ${notoSansKR.variable}`}>
+      <body>
         <Header />
         <main>{children}</main>
       </body>

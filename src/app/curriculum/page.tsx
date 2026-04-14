@@ -77,7 +77,7 @@ export default function CurriculumPage() {
                               <li key={node.id} className="flex items-center justify-between gap-2">
                                 <span className="flex items-center gap-2 min-w-0">
                                   <span className="text-[10px] text-[#c3bfb8] tabular-nums flex-shrink-0">{String(ni + 1).padStart(2, '0')}</span>
-                                  <span className="text-[12px] text-[#4a4845] truncate">{node.title}</span>
+                                  <span className="text-[12px] text-[#1a1918] truncate">{node.title}</span>
                                 </span>
                                 <span className="text-[11px] text-[#c3bfb8] tabular-nums flex-shrink-0">{node.hours}h</span>
                               </li>
@@ -87,7 +87,7 @@ export default function CurriculumPage() {
 
                         {/* 단일 노드 — 설명 */}
                         {subject.nodes.length === 1 && (
-                          <p className="text-[12px] text-[#4a4845] leading-[1.75] mb-4">
+                          <p className="text-[12px] text-[#1a1918] leading-[1.75] mb-4">
                             {subject.nodes[0].description.slice(0, 72)}…
                           </p>
                         )}
@@ -95,7 +95,7 @@ export default function CurriculumPage() {
                         {/* Topics */}
                         <div className="flex flex-wrap gap-1.5">
                           {allTopics.map((t) => (
-                            <span key={t} className="text-[11px] text-[#4a4845] bg-[#f7f6f3] border border-[#e4e1da] px-2 py-0.5 rounded-md">
+                            <span key={t} className="text-[11px] text-[#3a3835] bg-[#f7f6f3] border border-[#e4e1da] px-2 py-0.5 rounded-md">
                               {t}
                             </span>
                           ))}

@@ -77,10 +77,10 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
               <span className="text-[#e4e1da]">·</span>
               <span className="text-[13px] text-[#97938c]">{node.lessons.length}개 세션</span>
             </div>
-            <p className="text-[14px] text-[#4a4845] leading-[1.9] max-w-2xl mb-6">{node.description}</p>
+            <p className="text-[15px] text-[#1a1918] leading-[1.9] max-w-2xl mb-6">{node.description}</p>
             <div className="flex flex-wrap gap-1.5">
               {node.topics.map((t) => (
-                <span key={t} className="text-[11px] text-[#4a4845] bg-white border border-[#e4e1da] px-3 py-1 rounded-full">
+                <span key={t} className="text-[12px] text-[#3a3835] bg-white border border-[#e4e1da] px-3 py-1 rounded-full">
                   {t}
                 </span>
               ))}
@@ -108,7 +108,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                     <span className={`text-[11px] tabular-nums flex-shrink-0 w-5 font-medium ${open ? 'text-[#1a1918]' : 'text-[#d8d5cf]'}`}>
                       {String(i + 1).padStart(2, '0')}
                     </span>
-                    <span className={`flex-1 text-[14px] leading-snug ${open ? 'font-semibold text-[#1a1918]' : 'font-medium text-[#3a3835]'}`}>
+                    <span className={`flex-1 text-[14px] leading-snug ${open ? 'font-semibold text-[#1a1918]' : 'font-medium text-[#1a1918]'}`}>
                       {lesson.title}
                     </span>
                     <span className={`text-[11px] tabular-nums px-2.5 py-1 rounded-full flex-shrink-0 font-medium ${
@@ -125,14 +125,14 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                     <div className="px-8 pb-7 pt-1 bg-[#f7f6f3] border-t border-[#eceae5]">
                       <div className="ml-11">
                         {lesson.summary && (
-                          <p className="text-[13px] text-[#4a4845] leading-[1.9] mb-5">{lesson.summary}</p>
+                          <p className="text-[14px] text-[#1a1918] leading-[1.9] mb-5">{lesson.summary}</p>
                         )}
                         {lesson.objectives && lesson.objectives.length > 0 && (
                           <div>
-                            <p className="text-[10px] font-semibold text-[#c3bfb8] uppercase tracking-[0.16em] mb-3">학습 목표</p>
+                            <p className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.16em] mb-3">학습 목표</p>
                             <ul className="space-y-2">
                               {lesson.objectives.map((obj, oi) => (
-                                <li key={oi} className="flex items-start gap-2.5 text-[13px] text-[#4a4845]">
+                                <li key={oi} className="flex items-start gap-2.5 text-[14px] text-[#1a1918]">
                                   <span className="text-[#d8d5cf] mt-1 flex-shrink-0">—</span>
                                   <span>{obj}</span>
                                 </li>

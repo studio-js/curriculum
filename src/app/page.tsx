@@ -44,7 +44,7 @@ export default function HomePage() {
             <h1 className="text-[36px] font-bold text-[#1a1918] leading-[1.2] tracking-tight mb-5">
               {course.name}
             </h1>
-            <p className="text-[15px] text-[#3a3835] leading-[1.9]">{course.goal}</p>
+            <p className="text-[15px] text-[#1a1918] leading-[1.9]">{course.goal}</p>
             <Link
               href="/curriculum"
               className="inline-flex items-center gap-2 mt-8 px-6 py-3 bg-[#1a1918] text-white text-[13px] font-semibold tracking-[0.04em] rounded-xl hover:bg-[#2e2c29] transition-colors"

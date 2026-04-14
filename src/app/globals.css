@@ -1,27 +1,34 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #111111;
+  --bg: #ffffff;
+  --card: #ffffff;
+  --border: #e5e5e5;
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-muted: #999999;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-}
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
 
-* {
-  box-sizing: border-box;
-}
+  /* 한국어 단어 단위 줄바꿈 — 음절 중간에서 안 잘리도록 전역 적용 */
+  * {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
 
-html {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-body {
-  background: #ffffff;
-  color: #111111;
-  font-size: 15px;
-  line-height: 1.6;
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-size: 16px;
+    line-height: 1.65;
+  }
 }

@@ -2,19 +2,10 @@ import Link from 'next/link';
 import { curriculumData } from '@/data/curriculum';
 import { Category } from '@/types/curriculum';
 
-const categoryMeta: Record<Category, { label: string; description: string }> = {
-  정규교과: {
-    label: '정규교과',
-    description: '데이터 과학자에게 필요한 핵심 기술을 체계적으로 습득하는 이론·실습 과목',
-  },
-  프로젝트: {
-    label: '프로젝트',
-    description: '실제 비즈니스 데이터로 수행하는 실전 과제 및 해커톤',
-  },
-  기타: {
-    label: '기타',
-    description: '과정 시작·마무리 및 커리어 지원 프로그램',
-  },
+const categoryMeta: Record<Category, { desc: string }> = {
+  정규교과: { desc: '데이터 과학자에게 필요한 핵심 기술을 체계적으로 습득하는 이론·실습 과목' },
+  프로젝트: { desc: '실제 비즈니스 데이터로 수행하는 실전 과제 및 해커톤' },
+  기타: { desc: '과정 시작·마무리 및 커리어 지원 프로그램' },
 };
 
 export default function CurriculumPage() {
@@ -22,11 +13,7 @@ export default function CurriculumPage() {
   const categories: Category[] = ['정규교과', '프로젝트', '기타'];
 
   const byCategory = subjects.reduce<Record<Category, typeof subjects>>(
-    (acc, s) => {
-      if (!acc[s.category]) acc[s.category] = [];
-      acc[s.category].push(s);
-      return acc;
-    },
+    (acc, s) => { (acc[s.category] ??= []).push(s); return acc; },
     {} as Record<Category, typeof subjects>
   );
 
@@ -38,82 +25,96 @@ export default function CurriculumPage() {
   return (
     <div className="max-w-5xl mx-auto px-8">
 
-      {/* Header */}
-      <section className="pt-14 pb-10 border-b border-[#e8e8e8]">
-        <h1 className="text-[26px] font-medium text-[#111] tracking-tight mb-2">커리큘럼</h1>
-        <p className="text-[14px] text-[#666]">
-          {subjects.length}개 교과목 · {totalSessions}개 세션 · 총 {totalHours}h
-        </p>
+      <section className="py-12">
+        <h1 className="text-[30px] font-bold text-[#1a1a1a] tracking-tight mb-2">커리큘럼</h1>
+        <p className="text-[15px] text-[#777]">{subjects.length}개 교과목 · {totalSessions}개 세션 · 총 {totalHours}h</p>
       </section>
 
-      {/* Categories */}
-      <section className="py-12 space-y-16">
+      <div className="space-y-14 pb-20">
         {categories.map((cat) => {
           const items = byCategory[cat];
-          if (!items || items.length === 0) return null;
-          const meta = categoryMeta[cat];
+          if (!items?.length) return null;
           const catHours = items.reduce((sum, s) => sum + s.totalHours, 0);
 
           return (
-            <div key={cat}>
-              {/* Category header */}
-              <div className="mb-7">
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <h2 className="text-[16px] font-medium text-[#111]">{meta.label}</h2>
-                  <span className="text-[12px] text-[#999] tabular-nums">{catHours}h</span>
+            <section key={cat}>
+              <div className="flex items-end justify-between mb-5 pb-4 border-b border-[#e5e5e5]">
+                <div>
+                  <h2 className="text-[20px] font-bold text-[#1a1a1a] mb-1">{cat}</h2>
+                  <p className="text-[14px] text-[#777]">{categoryMeta[cat].desc}</p>
                 </div>
-                <p className="text-[13px] text-[#777]">{meta.description}</p>
+                <span className="text-[13px] text-[#aaa] tabular-nums flex-shrink-0 ml-4">{catHours}h</span>
               </div>
 
-              {/* Cards grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {items.map((subject) => {
-                  const subjectSessions = subject.nodes.reduce((sum, n) => sum + n.lessons.length, 0);
-                  const preview = subject.nodes[0].description;
+                  const sessions = subject.nodes.reduce((s, n) => s + n.lessons.length, 0);
+                  const allTopics = subject.nodes.flatMap(n => n.topics).slice(0, 4);
 
                   return (
                     <Link
                       key={subject.id}
                       href={`/curriculum/${subject.id}`}
-                      className="group flex flex-col border border-[#e8e8e8] rounded-xl p-5 hover:border-[#222] hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-all duration-150 bg-white"
+                      className="group flex flex-col bg-white border border-[#e5e5e5] rounded-xl overflow-hidden hover:border-[#1a1a1a] hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all duration-150"
                     >
-                      {/* Card header */}
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <span className="text-[11px] text-[#888] tracking-wider uppercase">
-                          {subject.nodes.length > 1
-                            ? `${subject.nodes.length}개 노드`
-                            : '단일 노드'}
-                        </span>
-                        <span className="text-[12px] font-medium text-[#333] tabular-nums flex-shrink-0">
-                          {subject.totalHours}h
-                        </span>
+                      {/* Card top */}
+                      <div className="p-5 flex-1">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[11px] font-medium text-[#999] tracking-widest uppercase">
+                            {subject.nodes.length > 1 ? `${subject.nodes.length}개 노드` : '단일 노드'}
+                          </span>
+                          <span className="text-[13px] font-semibold text-[#333] tabular-nums">{subject.totalHours}h</span>
+                        </div>
+
+                        <h3 className="text-[16px] font-semibold text-[#1a1a1a] leading-snug mb-4 group-hover:text-[#000]">
+                          {subject.title}
+                        </h3>
+
+                        {/* Node list (다중 노드인 경우) */}
+                        {subject.nodes.length > 1 && (
+                          <ul className="space-y-1.5 mb-4">
+                            {subject.nodes.map((node, ni) => (
+                              <li key={node.id} className="flex items-center justify-between gap-2">
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <span className="text-[10px] text-[#ccc] font-mono tabular-nums flex-shrink-0">{String(ni + 1).padStart(2, '0')}</span>
+                                  <span className="text-[13px] text-[#555] truncate">{node.title}</span>
+                                </span>
+                                <span className="text-[12px] text-[#bbb] tabular-nums flex-shrink-0">{node.hours}h</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {/* 단일 노드면 설명 한 줄 */}
+                        {subject.nodes.length === 1 && (
+                          <p className="text-[13px] text-[#666] leading-[1.7] mb-4">
+                            {subject.nodes[0].description.slice(0, 72)}…
+                          </p>
+                        )}
+
+                        {/* Topics */}
+                        <div className="flex flex-wrap gap-1.5">
+                          {allTopics.map((t) => (
+                            <span key={t} className="text-[11px] text-[#666] bg-[#f5f5f5] border border-[#ebebeb] px-2 py-0.5 rounded-md">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
                       </div>
 
-                      {/* Title */}
-                      <h3 className="text-[15px] font-medium text-[#111] leading-snug mb-2.5 group-hover:text-[#000]">
-                        {subject.title}
-                      </h3>
-
-                      {/* Description */}
-                      <p className="text-[13px] text-[#666] leading-relaxed flex-1 mb-4 line-clamp-3">
-                        {preview}
-                      </p>
-
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-3.5 border-t border-[#f2f2f2]">
-                        <span className="text-[12px] text-[#aaa]">{subjectSessions}개 세션</span>
-                        <span className="text-[12px] text-[#aaa] group-hover:text-[#333] transition-colors">
-                          보기 →
-                        </span>
+                      {/* Card footer */}
+                      <div className="flex items-center justify-between px-5 py-3 bg-[#fafafa] border-t border-[#f0f0f0]">
+                        <span className="text-[12px] text-[#aaa]">{sessions}개 세션</span>
+                        <span className="text-[12px] text-[#bbb] group-hover:text-[#555] transition-colors">보기 →</span>
                       </div>
                     </Link>
                   );
                 })}
               </div>
-            </div>
+            </section>
           );
         })}
-      </section>
+      </div>
 
     </div>
   );

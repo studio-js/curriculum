@@ -65,55 +65,25 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
         <div className="px-10 py-10">
 
           {/* Node header */}
-          <div className="bg-white rounded-2xl border border-[#e5e5e5] mb-5 overflow-hidden">
-
-            {/* Top: title + meta */}
-            <div className="flex gap-10 p-8 border-b border-[#f0f0f0]">
-              {/* Left */}
-              <div className="flex-1 min-w-0">
-                {subject.nodes.length > 1 && (
-                  <p className="text-[10px] tracking-widest text-[#ccc] uppercase mb-2">
-                    노드 {String(activeNode + 1).padStart(2, '0')} / {subject.nodes.length}
-                  </p>
-                )}
-                <h2 className="text-[24px] font-bold text-[#1a1a1a] leading-snug mb-4">{node.title}</h2>
-                <p className="text-[14px] text-[#666] leading-[1.9] mb-5">{node.description}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {node.topics.map((t) => (
-                    <span key={t} className="text-[11px] text-[#555] bg-[#f5f5f5] border border-[#ebebeb] px-2.5 py-1 rounded-full">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right: stats */}
-              <div className="w-44 flex-shrink-0 flex flex-col gap-3">
-                <div className="bg-[#f5f5f5] rounded-xl p-5 text-center">
-                  <p className="text-[10px] tracking-widest text-[#bbb] uppercase mb-2">학습 시간</p>
-                  <p className="text-[36px] font-bold tabular-nums text-[#1a1a1a] leading-none">{node.hours}</p>
-                  <p className="text-[13px] text-[#bbb] mt-1">hours</p>
-                </div>
-                <div className="bg-[#f5f5f5] rounded-xl p-5 text-center">
-                  <p className="text-[10px] tracking-widest text-[#bbb] uppercase mb-2">세션 수</p>
-                  <p className="text-[36px] font-bold tabular-nums text-[#1a1a1a] leading-none">{node.lessons.length}</p>
-                  <p className="text-[13px] text-[#bbb] mt-1">sessions</p>
-                </div>
-              </div>
+          <div className="mb-5">
+            {subject.nodes.length > 1 && (
+              <p className="text-[11px] tracking-widest text-[#bbb] uppercase mb-3">
+                노드 {String(activeNode + 1).padStart(2, '0')} / {subject.nodes.length}
+              </p>
+            )}
+            <h2 className="text-[28px] font-bold text-[#1a1a1a] leading-snug mb-3">{node.title}</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <span className="text-[13px] text-[#aaa]">{node.hours}h</span>
+              <span className="text-[#ddd]">·</span>
+              <span className="text-[13px] text-[#aaa]">{node.lessons.length}개 세션</span>
             </div>
-
-            {/* Bottom: session preview grid */}
-            <div className="px-8 py-6 bg-[#fafafa]">
-              <p className="text-[10px] tracking-widest text-[#bbb] uppercase mb-4">세션 목록</p>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                {node.lessons.map((lesson, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="text-[10px] font-mono text-[#ddd] tabular-nums flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="text-[13px] text-[#555] truncate flex-1">{lesson.title}</span>
-                    <span className="text-[11px] text-[#ccc] tabular-nums flex-shrink-0">{lesson.hours}h</span>
-                  </div>
-                ))}
-              </div>
+            <p className="text-[15px] text-[#555] leading-[1.9] max-w-2xl mb-6">{node.description}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {node.topics.map((t) => (
+                <span key={t} className="text-[12px] text-[#666] bg-white border border-[#e5e5e5] px-3 py-1 rounded-full">
+                  {t}
+                </span>
+              ))}
             </div>
           </div>
 

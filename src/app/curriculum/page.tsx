@@ -27,7 +27,7 @@ export default function CurriculumPage() {
 
       <section className="py-12">
         <h1 className="text-[30px] font-bold text-[#1a1918] tracking-tight mb-2">커리큘럼</h1>
-        <p className="text-[14px] text-[#97938c] font-light">{subjects.length}개 교과목 · {totalSessions}개 세션 · 총 {totalHours}h</p>
+        <p className="text-[14px] text-[#97938c]">{subjects.length}개 교과목 · {totalSessions}개 세션 · 총 {totalHours}h</p>
       </section>
 
       <div className="space-y-14 pb-20">
@@ -41,7 +41,7 @@ export default function CurriculumPage() {
               <div className="flex items-end justify-between mb-5 pb-4 border-b border-[#e4e1da]">
                 <div>
                   <h2 className="text-[20px] font-bold text-[#1a1918] mb-1">{cat}</h2>
-                  <p className="text-[13px] text-[#97938c] font-light">{categoryMeta[cat].desc}</p>
+                  <p className="text-[13px] text-[#97938c]">{categoryMeta[cat].desc}</p>
                 </div>
                 <span className="text-[13px] text-[#c3bfb8] tabular-nums flex-shrink-0 ml-4 font-medium">{catHours}h</span>
               </div>
@@ -63,7 +63,7 @@ export default function CurriculumPage() {
                           <span className="text-[10px] font-medium text-[#c3bfb8] tracking-[0.14em] uppercase">
                             {subject.nodes.length > 1 ? `${subject.nodes.length}개 노드` : '단일 노드'}
                           </span>
-                          <span className="text-[13px] font-bold text-[#58554f] tabular-nums">{subject.totalHours}h</span>
+                          <span className="text-[13px] font-bold text-[#3a3835] tabular-nums">{subject.totalHours}h</span>
                         </div>
 
                         <h3 className="text-[15px] font-semibold text-[#1a1918] leading-snug mb-4 group-hover:text-[#000]">
@@ -77,7 +77,7 @@ export default function CurriculumPage() {
                               <li key={node.id} className="flex items-center justify-between gap-2">
                                 <span className="flex items-center gap-2 min-w-0">
                                   <span className="text-[10px] text-[#c3bfb8] tabular-nums flex-shrink-0">{String(ni + 1).padStart(2, '0')}</span>
-                                  <span className="text-[12px] text-[#7a776f] truncate font-light">{node.title}</span>
+                                  <span className="text-[12px] text-[#4a4845] truncate">{node.title}</span>
                                 </span>
                                 <span className="text-[11px] text-[#c3bfb8] tabular-nums flex-shrink-0">{node.hours}h</span>
                               </li>
@@ -87,7 +87,7 @@ export default function CurriculumPage() {
 
                         {/* 단일 노드 — 설명 */}
                         {subject.nodes.length === 1 && (
-                          <p className="text-[12px] text-[#7a776f] leading-[1.75] mb-4 font-light">
+                          <p className="text-[12px] text-[#4a4845] leading-[1.75] mb-4">
                             {subject.nodes[0].description.slice(0, 72)}…
                           </p>
                         )}
@@ -95,7 +95,7 @@ export default function CurriculumPage() {
                         {/* Topics */}
                         <div className="flex flex-wrap gap-1.5">
                           {allTopics.map((t) => (
-                            <span key={t} className="text-[11px] text-[#7a776f] bg-[#f7f6f3] border border-[#e4e1da] px-2 py-0.5 rounded-md">
+                            <span key={t} className="text-[11px] text-[#4a4845] bg-[#f7f6f3] border border-[#e4e1da] px-2 py-0.5 rounded-md">
                               {t}
                             </span>
                           ))}
@@ -105,7 +105,7 @@ export default function CurriculumPage() {
                       {/* Card footer */}
                       <div className="flex items-center justify-between px-5 py-3 bg-[#f7f6f3] border-t border-[#eceae5]">
                         <span className="text-[11px] text-[#c3bfb8] font-medium">{sessions}개 세션</span>
-                        <span className="text-[12px] text-[#c3bfb8] group-hover:text-[#58554f] transition-colors">보기 →</span>
+                        <span className="text-[12px] text-[#c3bfb8] group-hover:text-[#3a3835] transition-colors">보기 →</span>
                       </div>
                     </Link>
                   );

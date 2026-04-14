@@ -44,7 +44,7 @@ export default function HomePage() {
             <h1 className="text-[36px] font-bold text-[#1a1918] leading-[1.2] tracking-tight mb-5">
               {course.name}
             </h1>
-            <p className="text-[15px] text-[#58554f] leading-[1.9] font-light">{course.goal}</p>
+            <p className="text-[15px] text-[#3a3835] leading-[1.9]">{course.goal}</p>
             <Link
               href="/curriculum"
               className="inline-flex items-center gap-2 mt-8 px-6 py-3 bg-[#1a1918] text-white text-[13px] font-semibold tracking-[0.04em] rounded-xl hover:bg-[#2e2c29] transition-colors"
@@ -58,7 +58,7 @@ export default function HomePage() {
             <p className="text-[10px] tracking-[0.2em] text-[#97938c] uppercase mb-3 font-medium">훈련 완료율</p>
             <div className="flex items-end gap-1 mb-4">
               <span className="text-[54px] font-bold tabular-nums leading-none text-[#1a1918]">{completion}</span>
-              <span className="text-[20px] text-[#c3bfb8] mb-1 font-light">%</span>
+              <span className="text-[20px] text-[#c3bfb8] mb-1">%</span>
             </div>
             <div className="h-[2px] bg-[#e4e1da] rounded-full overflow-hidden mb-4">
               <div className="h-full bg-[#1a1918] rounded-full transition-all" style={{ width: `${completion}%` }} />
@@ -87,7 +87,7 @@ export default function HomePage() {
               <span className="text-[12px] font-semibold text-[#c3bfb8] tabular-nums flex-shrink-0 mt-0.5">{h.num}</span>
               <div>
                 <p className="text-[15px] font-semibold text-[#1a1918] mb-2">{h.label}</p>
-                <p className="text-[13px] text-[#7a776f] leading-[1.8] font-light">{h.desc}</p>
+                <p className="text-[13px] text-[#4a4845] leading-[1.8]">{h.desc}</p>
               </div>
             </div>
           ))}
@@ -110,7 +110,7 @@ export default function HomePage() {
             return (
               <div key={cat} className={catIdx > 0 ? 'border-t border-[#eceae5]' : ''}>
                 <div className="flex items-center justify-between px-6 py-3 bg-[#f7f6f3] border-b border-[#eceae5]">
-                  <p className="text-[11px] font-semibold text-[#58554f] tracking-[0.08em] uppercase">{cat}</p>
+                  <p className="text-[11px] font-semibold text-[#3a3835] tracking-[0.08em] uppercase">{cat}</p>
                   <p className="text-[11px] text-[#c3bfb8] tabular-nums">{items.reduce((s, x) => s + x.totalHours, 0)}h</p>
                 </div>
                 {items.map((subject, i) => {
@@ -125,8 +125,8 @@ export default function HomePage() {
                       <span className="text-[14px] font-medium text-[#1a1918] group-hover:text-[#000] flex-shrink-0">{subject.title}</span>
                       <span className="flex-1 border-b border-dashed border-[#e4e1da] mb-[2px]" />
                       <span className="text-[12px] text-[#c3bfb8] tabular-nums flex-shrink-0">{sessions}개 세션</span>
-                      <span className="text-[13px] font-semibold text-[#58554f] tabular-nums flex-shrink-0">{subject.totalHours}h</span>
-                      <span className="text-[12px] text-[#c3bfb8] group-hover:text-[#7a776f] transition-colors flex-shrink-0">→</span>
+                      <span className="text-[13px] font-semibold text-[#3a3835] tabular-nums flex-shrink-0">{subject.totalHours}h</span>
+                      <span className="text-[12px] text-[#c3bfb8] group-hover:text-[#4a4845] transition-colors flex-shrink-0">→</span>
                     </Link>
                   );
                 })}

@@ -38,17 +38,17 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                   onClick={() => { setActiveNode(i); setActiveLesson(null); }}
                   className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors ${
                     activeNode === i
-                      ? 'bg-[#1a1a1a] text-white'
+                      ? 'bg-[#f0f0f0] text-[#1a1a1a]'
                       : 'text-[#555] hover:bg-[#f5f5f5]'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className={`text-[10px] font-mono tabular-nums flex-shrink-0 ${activeNode === i ? 'text-[#888]' : 'text-[#ccc]'}`}>
+                    <span className={`text-[10px] font-mono tabular-nums flex-shrink-0 ${activeNode === i ? 'text-[#999]' : 'text-[#ccc]'}`}>
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <div className="min-w-0">
-                      <p className={`text-[12px] font-medium leading-snug truncate ${activeNode === i ? 'text-white' : 'text-[#333]'}`}>{n.title}</p>
-                      <p className={`text-[11px] mt-0.5 tabular-nums ${activeNode === i ? 'text-[#999]' : 'text-[#ccc]'}`}>
+                      <p className={`text-[12px] font-medium leading-snug truncate ${activeNode === i ? 'text-[#1a1a1a]' : 'text-[#333]'}`}>{n.title}</p>
+                      <p className={`text-[11px] mt-0.5 tabular-nums ${activeNode === i ? 'text-[#888]' : 'text-[#ccc]'}`}>
                         {n.lessons.length}세션 · {n.hours}h
                       </p>
                     </div>

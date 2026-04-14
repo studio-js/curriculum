@@ -113,18 +113,23 @@ export default function HomePage() {
                   <p className="text-[12px] font-semibold text-[#555] tracking-wide">{cat}</p>
                   <p className="text-[12px] text-[#bbb] tabular-nums">{items.reduce((s, x) => s + x.totalHours, 0)}h</p>
                 </div>
-                {items.map((subject, i) => (
-                  <Link
-                    key={subject.id}
-                    href={`/curriculum/${subject.id}`}
-                    className="group flex items-center px-6 py-2.5 border-b border-[#f8f8f8] last:border-0 hover:bg-[#fafafa] transition-colors"
-                  >
-                    <span className="text-[12px] text-[#999] font-mono tabular-nums w-7 flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="text-[15px] font-medium text-[#1a1a1a] group-hover:text-[#000] flex-1">{subject.title}</span>
-                    <span className="text-[13px] font-medium text-[#666] tabular-nums flex-shrink-0 ml-4">{subject.totalHours}h</span>
-                    <span className="text-[13px] text-[#bbb] group-hover:text-[#777] transition-colors ml-3 flex-shrink-0">→</span>
-                  </Link>
-                ))}
+                {items.map((subject, i) => {
+                  const sessions = subject.nodes.reduce((s, n) => s + n.lessons.length, 0);
+                  return (
+                    <Link
+                      key={subject.id}
+                      href={`/curriculum/${subject.id}`}
+                      className="group flex items-center gap-4 px-6 py-3 border-b border-[#f8f8f8] last:border-0 hover:bg-[#fafafa] transition-colors"
+                    >
+                      <span className="text-[12px] text-[#ccc] font-mono tabular-nums flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                      <span className="text-[14px] font-medium text-[#1a1a1a] group-hover:text-[#000] flex-shrink-0">{subject.title}</span>
+                      <span className="flex-1 border-b border-dashed border-[#e8e8e8] mb-[2px]" />
+                      <span className="text-[12px] text-[#bbb] tabular-nums flex-shrink-0">{sessions}개 세션</span>
+                      <span className="text-[13px] font-semibold text-[#444] tabular-nums flex-shrink-0">{subject.totalHours}h</span>
+                      <span className="text-[12px] text-[#ccc] group-hover:text-[#888] transition-colors flex-shrink-0">→</span>
+                    </Link>
+                  );
+                })}
               </div>
             );
           })}

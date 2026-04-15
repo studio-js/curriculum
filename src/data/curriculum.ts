@@ -32,7 +32,6 @@ export const curriculumData: CurriculumData = {
               hours: 4,
               summary: 'int·float·str·bool 기본 자료형과 if·for·while 제어 흐름을 익힌다. 리스트 컴프리헨션으로 코드를 간결하게 작성하는 패턴을 실습한다.',
               objectives: ['Python 기본 자료형 6가지를 설명할 수 있다', '조건문과 반복문을 조합해 간단한 데이터 처리 로직을 작성한다', '리스트 컴프리헨션으로 기존 코드를 리팩터링한다'],
-              notebookPath: '/notebooks/python-basics-01.ipynb',
             },
             {
               title: '함수·클래스·모듈 설계 패턴',

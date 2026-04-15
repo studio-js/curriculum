@@ -1,0 +1,868 @@
+'use client';
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import type { NotebookSection, CodeBlock, CodeOutput } from '@/lib/notebookParser';
+import { normalizeSections } from '@/lib/notebookParser';
+import { useColabKernel, type ExecResult } from '@/hooks/useColabKernel';
+import ColabConnect from '@/components/ColabConnect';
+
+/* ─────────────────────────────────────────────────────
+   코드 하이라이팅 — 웜 라이트 테마
+   주석이 확실히 보이되 은은하게, 배경과 어우러지도록
+───────────────────────────────────────────────────── */
+const warmLight: Record<string, React.CSSProperties> = {
+  'code[class*="language-"]': {
+    color: '#2d2a27', background: 'none',
+    fontFamily: '"SF Mono","Fira Code","Fira Mono",monospace',
+    fontSize: '13px', lineHeight: '1.8',
+  },
+  'pre[class*="language-"]': {
+    color: '#2d2a27', background: 'transparent',
+    padding: '0', margin: '0', overflow: 'auto',
+  },
+  comment:      { color: '#8a8480', fontStyle: 'italic' },   // 가독성 확보
+  punctuation:  { color: '#a5a09a' },
+  operator:     { color: '#7a7570' },
+  string:       { color: '#3d7a52' },                         // 더 진한 초록
+  'template-string': { color: '#3d7a52' },
+  keyword:      { color: '#7a4f2d' },                         // 진한 앰버
+  builtin:      { color: '#7a4f2d' },
+  'class-name': { color: '#2d5a8a' },                         // 슬레이트 블루
+  function:     { color: '#2d5a8a' },
+  number:       { color: '#7a5230' },
+  boolean:      { color: '#7a4f2d' },
+  decorator:    { color: '#7a7570' },
+  'attr-name':  { color: '#7a4f2d' },
+};
+
+/* ─────────────────────────────────────────────────────
+   마크다운 컴포넌트
+───────────────────────────────────────────────────── */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const md: Record<string, React.FC<any>> = {
+  h1: ({ children }) => <h1 className="text-[20px] font-bold text-[#1a1918] mb-4 leading-snug tracking-tight break-words">{children}</h1>,
+  h2: ({ children }) => <h2 className="text-[17px] font-semibold text-[#1a1918] mb-3 mt-1 leading-snug tracking-tight break-words">{children}</h2>,
+  h3: ({ children }) => <h3 className="text-[13px] font-semibold text-[#1a1918] mb-2 mt-4 uppercase tracking-[0.07em] break-words">{children}</h3>,
+  p:  ({ children }) => <p className="text-[14px] text-[#3a3835] leading-[1.95] mb-4 break-words">{children}</p>,
+  ul: ({ children }) => <ul className="mb-4 space-y-1.5">{children}</ul>,
+  ol: ({ children }) => <ol className="mb-4 space-y-1.5">{children}</ol>,
+  li: ({ children }) => (
+    <li className="flex items-start gap-2 text-[14px] text-[#3a3835] leading-[1.85]">
+      <span className="text-[#d8d5cf] mt-[5px] flex-shrink-0 text-[8px]">▸</span>
+      <span className="break-words min-w-0">{children}</span>
+    </li>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-2 border-[#e4e1da] pl-4 py-0.5 my-4 text-[13px] text-[#97938c] italic break-words">{children}</blockquote>
+  ),
+  strong: ({ children }) => <strong className="font-semibold text-[#1a1918]">{children}</strong>,
+  em:     ({ children }) => <em className="italic text-[#58554f]">{children}</em>,
+  /* 인라인 코드: 줄바꿈 허용 / 펜스드 코드블록은 pre가 처리 */
+  code:   ({ children, className }) => {
+    if (className?.startsWith('language-')) {
+      return <code className="text-[12.5px] font-mono text-[#2d2a27] whitespace-pre">{children}</code>;
+    }
+    return <code className="bg-[#eceae5] text-[12.5px] px-[5px] py-[2px] rounded text-[#3a3835] font-mono break-all">{children}</code>;
+  },
+  /* 펜스드 코드블록: 카드 안에서 가로 스크롤 */
+  pre: ({ children }) => (
+    <div className="overflow-x-auto my-3 rounded-lg border border-[#e4e1da]">
+      <pre className="bg-[#f5f3ef] px-4 py-3 text-[12.5px] font-mono text-[#2d2a27] leading-relaxed whitespace-pre min-w-max">
+        {children}
+      </pre>
+    </div>
+  ),
+  table: ({ children }) => <div className="overflow-x-auto mb-5"><table className="w-full text-[13px] border-collapse">{children}</table></div>,
+  thead: ({ children }) => <thead className="border-b border-[#e4e1da]">{children}</thead>,
+  th:    ({ children }) => <th className="text-left py-2 pr-6 text-[11px] font-semibold text-[#97938c] uppercase tracking-[0.1em]">{children}</th>,
+  td:    ({ children }) => <td className="py-2 pr-6 text-[13px] text-[#3a3835] border-b border-[#f0ede8] break-words">{children}</td>,
+  hr:    () => <hr className="border-0 border-t border-[#eceae5] my-6" />,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  img:   ({ src, alt }: any) => {
+    if (!src) return null;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={alt ?? ''} className="max-w-full rounded-lg my-3 border border-[#e4e1da]" />;
+  },
+};
+
+/* ─────────────────────────────────────────────────────
+   마크다운 렌더러 — <img> raw HTML 태그도 처리
+   rehype-raw가 components 맵을 우회하므로
+   ReactMarkdown 전에 <img>를 추출해 직접 렌더링
+───────────────────────────────────────────────────── */
+const IMG_RE = /<img\s[^>]*>/gi;
+
+function MdWithImages({ children }: { children: string }) {
+  const parts: { type: 'md' | 'img'; content: string }[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  IMG_RE.lastIndex = 0;
+
+  while ((m = IMG_RE.exec(children)) !== null) {
+    if (m.index > last) parts.push({ type: 'md', content: children.slice(last, m.index) });
+    parts.push({ type: 'img', content: m[0] });
+    last = m.index + m[0].length;
+  }
+  if (last < children.length) parts.push({ type: 'md', content: children.slice(last) });
+
+  return (
+    <>
+      {parts.map((p, i) => {
+        if (p.type === 'img') {
+          const srcMatch = p.content.match(/src=["']([^"']+)["']/i);
+          const altMatch = p.content.match(/alt=["']([^"']*)["']/i);
+          if (!srcMatch?.[1]) return null;
+          // eslint-disable-next-line @next/next/no-img-element
+          return <img key={i} src={srcMatch[1]} alt={altMatch?.[1] ?? ''} className="max-w-full rounded-lg my-3 border border-[#e4e1da]" />;
+        }
+        return (
+          <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={md}>
+            {p.content}
+          </ReactMarkdown>
+        );
+      })}
+    </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   코드 출력 결과 표시
+───────────────────────────────────────────────────── */
+function OutputBlock({ outputs, idx }: { outputs: CodeOutput[]; idx: number }) {
+  if (!outputs.length) return null;
+  const hasError   = outputs.some(o => o.type === 'error');
+  const allImages  = outputs.flatMap(o => o.images ?? []);
+  const textOutputs = outputs.filter(o => o.text.trim());
+
+  return (
+    <div className={`mt-0 rounded-b-xl border-t overflow-hidden ${hasError ? 'border-[#e8b4a8] bg-[#fdf5f3]' : 'border-[#e4e1da] bg-[#eceae5]'}`}>
+      <div className={`flex items-center gap-2 px-4 py-2 border-b ${hasError ? 'border-[#e8b4a8] bg-[#faeae6]' : 'border-[#dedad4] bg-[#e4e1da]'}`}>
+        <span className={`text-[9px] font-semibold tracking-[0.18em] uppercase ${hasError ? 'text-[#b05030]' : 'text-[#97938c]'}`}>
+          Out [{idx + 1}]
+        </span>
+        {hasError && <span className="text-[9px] text-[#b05030] font-medium">오류</span>}
+      </div>
+      {textOutputs.length > 0 && (
+        <pre className={`px-4 py-3 text-[12.5px] font-mono leading-[1.75] whitespace-pre overflow-x-auto ${hasError ? 'text-[#b05030]' : 'text-[#4a4845]'}`}>
+          {textOutputs.map(o => o.text).join('\n')}
+        </pre>
+      )}
+      {allImages.map((src, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={i} src={src} alt="출력 결과" className="max-w-full px-4 pb-4 block" />
+      ))}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   실시간 실행 결과 (Colab 실행 후 표시)
+───────────────────────────────────────────────────── */
+function LiveOutputBlock({ result }: { result: ExecResult }) {
+  const hasError = !result.success;
+  return (
+    <div className={`rounded-b-xl border-t overflow-hidden ${hasError ? 'border-[#e8b4a8] bg-[#fdf5f3]' : 'border-[#a8d4b0] bg-[#f4faf5]'}`}>
+      <div className={`flex items-center gap-2 px-4 py-2 border-b ${hasError ? 'border-[#e8b4a8] bg-[#faeae6]' : 'border-[#9ecba8] bg-[#e6f4e9]'}`}>
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${hasError ? 'bg-[#c04030]' : 'bg-[#2d8a4a]'}`} />
+        <span className={`text-[9px] font-semibold tracking-[0.18em] uppercase ${hasError ? 'text-[#b04030]' : 'text-[#2d7a3a]'}`}>
+          실행 결과
+        </span>
+        {hasError && <span className="text-[9px] text-[#b04030]">오류</span>}
+      </div>
+      {(result.output || result.error) && (
+        <pre className={`px-4 py-3 text-[12.5px] font-mono leading-[1.75] whitespace-pre overflow-x-auto ${hasError ? 'text-[#b04030]' : 'text-[#1a3a20]'}`}>
+          {hasError ? result.error : result.output}
+        </pre>
+      )}
+      {result.images?.map((img, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={i} src={`data:image/png;base64,${img}`} alt="실행 결과" className="max-w-full px-4 pb-4 block" />
+      ))}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   핵심 개념 추출 (코드 없는 섹션용)
+───────────────────────────────────────────────────── */
+function extractKeyPoints(markdown: string): string[] {
+  return markdown
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => /^[-*+]\s+.+/.test(l) || /^#{2,3}\s+.+/.test(l))
+    .map(l => l.replace(/^[-*+#{]+\s+/, '').replace(/\*\*/g, '').trim())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+/* ─────────────────────────────────────────────────────
+   .ipynb 내보내기 (sections → file download)
+───────────────────────────────────────────────────── */
+function exportNotebook(sections: NotebookSection[], filename: string) {
+  const cells: object[] = [];
+  for (const sec of sections) {
+    if (sec.markdown.trim()) {
+      cells.push({
+        cell_type: 'markdown', metadata: {},
+        source: sec.markdown.split('\n').map((l, i, a) => i < a.length - 1 ? l + '\n' : l),
+      });
+    }
+    for (const block of sec.codes) {
+      cells.push({
+        cell_type: 'code', execution_count: null, metadata: {},
+        outputs: block.outputs.map(o => ({
+          output_type: o.type === 'error' ? 'error' : 'stream',
+          name: 'stdout',
+          text: [o.text + '\n'],
+        })),
+        source: block.source.split('\n').map((l, i, a) => i < a.length - 1 ? l + '\n' : l),
+      });
+    }
+  }
+  const nb = {
+    cells,
+    metadata: {
+      kernelspec: { display_name: 'Python 3', language: 'python', name: 'python3' },
+      language_info: { name: sections[0]?.language ?? 'python' },
+    },
+    nbformat: 4, nbformat_minor: 5,
+  };
+  const blob = new Blob([JSON.stringify(nb, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename.replace(/[/\\:*?"<>|]/g, '_')}.ipynb`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function storageKey(t: string) { return `notebook-edits::${t}`; }
+
+/* ═════════════════════════════════════════════════════
+   Props
+═════════════════════════════════════════════════════ */
+interface LessonViewerProps {
+  subjectTitle: string;
+  lessonTitle: string;
+  sections: NotebookSection[];
+  onClose: () => void;
+}
+
+/* ═════════════════════════════════════════════════════
+   Component
+═════════════════════════════════════════════════════ */
+export default function LessonViewer({
+  subjectTitle, lessonTitle, sections: initialSections, onClose,
+}: LessonViewerProps) {
+
+  /* ── 상태 ── */
+  const [localSections, setLocalSections] = useState<NotebookSection[]>(initialSections);
+  const [activeIdx,     setActiveIdx]     = useState(0);
+  const [codeKey,       setCodeKey]       = useState(0);
+  const [isEditMode,    setIsEditMode]    = useState(false);
+  const [editDraft,     setEditDraft]     = useState<NotebookSection[]>(initialSections);
+  const [focusedSec,    setFocusedSec]    = useState(0);
+  const [hasLocalSave,  setHasLocalSave]  = useState(false);
+
+  /* ── Colab 커널 ── */
+  const kernel = useColabKernel();
+  const [showColabConnect, setShowColabConnect] = useState(false);
+  // 실행 상태: key = `${sectionIdx}-${codeIdx}`
+  const [runStates,   setRunStates]   = useState<Record<string, 'running' | 'done' | 'error'>>({});
+  const [liveOutputs, setLiveOutputs] = useState<Record<string, ExecResult>>({});
+
+  const leftRef         = useRef<HTMLDivElement>(null);
+  const sectionRefs     = useRef<(HTMLDivElement | null)[]>([]);
+  const scrollLock      = useRef(false);
+  const scrollLockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ── localStorage 로드 ──────────────────────────────
+     저장된 편집 내용이 있으면 사용하되,
+     outputs(실행 결과)는 항상 신규 파싱 값으로 보완.
+     (이전 버전 localStorage에는 outputs가 없을 수 있음)
+  ──────────────────────────────────────────────── */
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey(lessonTitle));
+    let sections = initialSections;
+    let hadSave = false;
+    if (saved) {
+      try {
+        const parsed = normalizeSections(JSON.parse(saved));
+        // 편집된 markdown/code는 유지, outputs는 신규 파싱으로 복원
+        sections = parsed.map((sec, i) => ({
+          ...sec,
+          codes: sec.codes.map((code, ci) => ({
+            ...code,
+            outputs: initialSections[i]?.codes[ci]?.outputs ?? code.outputs,
+          })),
+        }));
+        hadSave = true;
+      } catch { /* skip */ }
+    }
+    setLocalSections(sections);
+    setHasLocalSave(hadSave);
+    setActiveIdx(0);
+    setIsEditMode(false);
+  }, [lessonTitle, initialSections]);
+
+  /* ── ESC ── */
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') isEditMode ? handleCancelEdit() : onClose();
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, onClose]);
+
+  /* ── 스크롤 감지 ─────────────────────────────────
+     트리거: 패널 중앙(50%) — 섹션 제목이 화면 절반을
+     넘어갔을 때 전환해야 "지금 보고 있는 섹션" 느낌
+     (25%는 너무 이르고, 50%가 체감상 자연스러움)
+  ──────────────────────────────────────────────── */
+  const updateActive = useCallback(() => {
+    if (scrollLock.current) return;
+    const panel = leftRef.current;
+    if (!panel) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = panel;
+    const panelRect = panel.getBoundingClientRect();
+
+    // 맨 위 도달 → 첫 섹션 강제 (section 0이 짧으면 section 1 top도 trigger 안에 들어오는 문제)
+    if (scrollTop <= 10) {
+      setActiveIdx(prev => { if (prev !== 0) setCodeKey(k => k + 1); return 0; });
+      return;
+    }
+
+    // 하단 도달 → 마지막 섹션 강제
+    if (scrollTop + clientHeight >= scrollHeight - 80) {
+      let last = 0;
+      sectionRefs.current.forEach((el, i) => { if (el) last = i; });
+      setActiveIdx(prev => { if (prev !== last) setCodeKey(k => k + 1); return last; });
+      return;
+    }
+
+    // 트리거: 패널 중앙선 — 섹션 top이 중앙을 넘으면 그 섹션이 현재 읽는 섹션
+    const triggerY = panelRect.top + clientHeight * 0.5;
+
+    let best = 0;
+    sectionRefs.current.forEach((el, i) => {
+      if (!el) return;
+      if (el.getBoundingClientRect().top <= triggerY) best = i;
+    });
+
+    setActiveIdx(prev => { if (prev !== best) setCodeKey(k => k + 1); return best; });
+  }, []);
+
+  useEffect(() => {
+    if (isEditMode) return;
+    const panel = leftRef.current;
+    if (!panel) return;
+    panel.addEventListener('scroll', updateActive, { passive: true });
+    return () => panel.removeEventListener('scroll', updateActive);
+  }, [isEditMode, updateActive]);
+
+  /* ── TOC 클릭: 즉시 하이라이트 + scroll lock ── */
+  const scrollTo = useCallback((idx: number) => {
+    setActiveIdx(idx);
+    setCodeKey(k => k + 1);
+
+    scrollLock.current = true;
+    if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+    scrollLockTimer.current = setTimeout(() => { scrollLock.current = false; }, 1000);
+
+    const el = sectionRefs.current[idx];
+    const panel = leftRef.current;
+    if (el && panel) {
+      const offset = el.getBoundingClientRect().top
+        - panel.getBoundingClientRect().top
+        + panel.scrollTop - 20;
+      panel.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+    }
+  }, []);
+
+  /* ─── 편집 핸들러 ──────────────────────────────── */
+  function enterEditMode() {
+    setEditDraft(localSections.map(s => ({
+      ...s,
+      codes: s.codes.map(b => ({ ...b })),
+    })));
+    setFocusedSec(activeIdx);
+    setIsEditMode(true);
+  }
+
+  function handleCancelEdit() { setEditDraft(localSections); setIsEditMode(false); }
+
+  function handleSave() {
+    // 편집 저장 시 outputs 유지 (원본 outputs는 보존)
+    localStorage.setItem(storageKey(lessonTitle), JSON.stringify(editDraft));
+    setLocalSections(editDraft);
+    setHasLocalSave(true);
+    setIsEditMode(false);
+  }
+
+  function handleReset() {
+    if (!confirm('저장된 편집 내용을 삭제하고 원본으로 되돌릴까요?')) return;
+    localStorage.removeItem(storageKey(lessonTitle));
+    setLocalSections(initialSections);
+    setEditDraft(initialSections);
+    setHasLocalSave(false);
+    setIsEditMode(false);
+  }
+
+  /* ── Colab 코드 실행 ── */
+  async function handleRun(sIdx: number, cIdx: number, code: string) {
+    if (kernel.status !== 'connected') {
+      setShowColabConnect(true);
+      return;
+    }
+    const key = `${sIdx}-${cIdx}`;
+    setRunStates(prev => ({ ...prev, [key]: 'running' }));
+    const result = await kernel.execute(code);
+    setLiveOutputs(prev => ({ ...prev, [key]: result }));
+    setRunStates(prev => ({ ...prev, [key]: result.success ? 'done' : 'error' }));
+  }
+
+  const updateMd = (idx: number, val: string) =>
+    setEditDraft(p => p.map((s, i) => i === idx ? { ...s, markdown: val } : s));
+
+  const updateCode = (sIdx: number, cIdx: number, val: string) =>
+    setEditDraft(p => p.map((s, i) => {
+      if (i !== sIdx) return s;
+      const codes = s.codes.map((b, ci) => ci === cIdx ? { ...b, source: val } : b);
+      return { ...s, codes };
+    }));
+
+  const addCodeBlock = (sIdx: number) =>
+    setEditDraft(p => p.map((s, i) =>
+      i === sIdx ? { ...s, codes: [...s.codes, { source: '# 코드를 입력하세요\n', outputs: [] }] } : s
+    ));
+
+  const removeCodeBlock = (sIdx: number, cIdx: number) =>
+    setEditDraft(p => p.map((s, i) =>
+      i === sIdx ? { ...s, codes: s.codes.filter((_, ci) => ci !== cIdx) } : s
+    ));
+
+  function addSection() {
+    const lang = localSections[0]?.language ?? 'python';
+    setEditDraft(p => [...p, {
+      id: `section-${Date.now()}`,
+      markdown: '## 새 섹션\n\n내용을 입력하세요.',
+      codes: [], language: lang,
+    }]);
+  }
+
+  function removeSection(idx: number) {
+    if (editDraft.length <= 1) return;
+    setEditDraft(p => p.filter((_, i) => i !== idx));
+    setFocusedSec(f => Math.min(f, editDraft.length - 2));
+  }
+
+  /* ── 계산값 ── */
+  const viewSecs     = isEditMode ? editDraft : localSections;
+  const rightIdx     = isEditMode ? focusedSec : activeIdx;
+  const rightSec     = viewSecs[rightIdx];
+  const hasCodes     = (rightSec?.codes.length ?? 0) > 0;
+  const total        = viewSecs.length;
+  const keyPoints    = !hasCodes && rightSec ? extractKeyPoints(rightSec.markdown) : [];
+  const nextCodeIdx  = !hasCodes && !isEditMode
+    ? localSections.findIndex((s, i) => i > rightIdx && s.codes.length > 0)
+    : -1;
+
+  /* ═══════════════════════════════════════════════
+     RENDER
+  ═══════════════════════════════════════════════ */
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#f7f6f3]">
+
+      {/* ── Colab 연결 모달 ── */}
+      {showColabConnect && (
+        <ColabConnect
+          status={kernel.status}
+          errorMsg={kernel.errorMsg}
+          onConnect={kernel.connect}
+          onClose={() => setShowColabConnect(false)}
+        />
+      )}
+
+      {/* ══ 헤더 ══ */}
+      <header className="flex-shrink-0 h-14 bg-white border-b border-[#e4e1da] flex items-center px-6 gap-4 z-10">
+        {!isEditMode ? (
+          <>
+            <button onClick={onClose} className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.06em] text-[#97938c] hover:text-[#1a1918] transition-colors uppercase">
+              ← 돌아가기
+            </button>
+            <span className="text-[#e4e1da]">|</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[12px] text-[#c3bfb8] truncate">{subjectTitle}</span>
+              <span className="text-[#e4e1da] text-[10px]">/</span>
+              <span className="text-[13px] font-semibold text-[#1a1918] truncate">{lessonTitle}</span>
+            </div>
+            {hasLocalSave && <span className="text-[10px] text-[#97938c] bg-[#f0ede8] px-2 py-0.5 rounded-full font-medium">편집됨</span>}
+          </>
+        ) : (
+          <>
+            <span className="text-[11px] font-semibold tracking-[0.08em] text-[#1a1918] uppercase">편집 모드</span>
+            <span className="text-[#e4e1da]">|</span>
+            <span className="text-[12px] text-[#97938c] truncate">{lessonTitle}</span>
+          </>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          {!isEditMode ? (
+            <>
+              <span className="text-[11px] text-[#c3bfb8] tabular-nums mr-1">{activeIdx + 1} / {total}</span>
+              <div className="w-20 h-[3px] bg-[#eceae5] rounded-full overflow-hidden mr-2">
+                <div className="h-full bg-[#1a1918] rounded-full transition-all duration-300"
+                     style={{ width: `${((activeIdx + 1) / total) * 100}%` }} />
+              </div>
+              {/* ── 코랩 연결 상태 ── */}
+              {kernel.status === 'connected' ? (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#e8f4e9] border border-[#a8d4b0]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#2d8a4a]" />
+                  <span className="text-[11px] text-[#2d7a3a] font-medium">코랩 연결됨</span>
+                  <button
+                    onClick={kernel.disconnect}
+                    className="text-[10px] text-[#7ab890] hover:text-[#2d7a3a] ml-1 transition-colors"
+                    title="연결 해제"
+                  >×</button>
+                </div>
+              ) : kernel.status === 'connecting' ? (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f0ede8]">
+                  <span className="inline-block w-3 h-3 border-2 border-[#97938c] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[11px] text-[#97938c]">연결 중</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowColabConnect(true)}
+                  className={`text-[11px] px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
+                    kernel.status === 'error'
+                      ? 'bg-[#fdf5f3] border border-[#e8b4a8] text-[#b04030] hover:bg-[#faeae6]'
+                      : 'bg-[#f0ede8] text-[#97938c] hover:bg-[#e4e1da] hover:text-[#1a1918]'
+                  }`}
+                >
+                  <span className="text-[10px]">⚡</span>
+                  {kernel.status === 'error' ? '재연결' : '코랩 연결'}
+                </button>
+              )}
+              <button onClick={() => exportNotebook(localSections, lessonTitle)}
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-[#f0ede8] text-[#97938c] hover:bg-[#e4e1da] hover:text-[#1a1918] transition-colors font-medium"
+                title="노트북을 .ipynb로 다운로드">
+                ↓ .ipynb
+              </button>
+              <button onClick={enterEditMode}
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-[#f0ede8] text-[#97938c] hover:bg-[#e4e1da] hover:text-[#1a1918] transition-colors font-medium">
+                편집
+              </button>
+              <button onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-[#97938c] hover:text-[#1a1918] hover:bg-[#f0ede8] transition-colors text-[18px] leading-none ml-1"
+                aria-label="닫기">×</button>
+            </>
+          ) : (
+            <>
+              {hasLocalSave && (
+                <button onClick={handleReset} className="text-[11px] px-3 py-1.5 rounded-lg text-[#97938c] hover:text-[#1a1918] transition-colors">
+                  원본 초기화
+                </button>
+              )}
+              <button onClick={() => exportNotebook(editDraft, lessonTitle)}
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-[#f0ede8] text-[#97938c] hover:bg-[#e4e1da] hover:text-[#1a1918] transition-colors font-medium">
+                ↓ .ipynb
+              </button>
+              <button onClick={handleCancelEdit}
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-[#f0ede8] text-[#97938c] hover:bg-[#e4e1da] hover:text-[#1a1918] transition-colors font-medium">
+                취소
+              </button>
+              <button onClick={handleSave}
+                className="text-[11px] px-4 py-1.5 rounded-lg bg-[#1a1918] text-white hover:bg-[#3a3835] transition-colors font-medium">
+                저장
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* ══ 바디 ══ */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* ── 목차 사이드바 ── */}
+        <aside className="w-52 flex-shrink-0 bg-white border-r border-[#e4e1da] overflow-y-auto hidden lg:block">
+          <div className="px-4 py-6">
+            <p className="text-[10px] tracking-[0.18em] text-[#c3bfb8] uppercase mb-3 font-medium">목차</p>
+            <ul className="space-y-0.5">
+              {viewSecs.map((sec, i) => {
+                const heading = sec.markdown.match(/^#{1,3}\s+(.+)/m)?.[1] ?? `섹션 ${i + 1}`;
+                const isActive = isEditMode ? focusedSec === i : activeIdx === i;
+                return (
+                  <li key={sec.id}>
+                    <button
+                      onClick={() => isEditMode ? setFocusedSec(i) : scrollTo(i)}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${isActive ? 'bg-[#f0ede8] text-[#1a1918]' : 'text-[#4a4845] hover:bg-[#f7f6f3]'}`}>
+                      <div className="flex items-start gap-2">
+                        <span className={`text-[10px] tabular-nums flex-shrink-0 font-medium mt-0.5 ${isActive ? 'text-[#97938c]' : 'text-[#c3bfb8]'}`}>
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <p className={`text-[12px] leading-snug ${isActive ? 'font-medium' : ''}`}>{heading}</p>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {isEditMode && (
+              <button onClick={addSection}
+                className="w-full mt-3 py-2 border border-dashed border-[#e4e1da] rounded-lg text-[11px] text-[#c3bfb8] hover:text-[#97938c] hover:border-[#d8d5cf] transition-colors">
+                + 섹션 추가
+              </button>
+            )}
+          </div>
+        </aside>
+
+        {/* ══ 이론 패널 ══ */}
+        {!isEditMode ? (
+          <div ref={leftRef} className="flex-1 overflow-y-auto">
+            <div className="max-w-[900px] mx-auto px-6 py-10 pb-40">
+              {localSections.map((sec, i) => (
+                <div key={sec.id} ref={el => { sectionRefs.current[i] = el; }} className="mb-4 relative">
+                  <div className={`absolute -left-4 top-0 bottom-0 w-[2px] rounded-full transition-all duration-300 ${activeIdx === i ? 'bg-[#1a1918] opacity-100' : 'opacity-0'}`} />
+                  <div className={`rounded-xl px-10 py-9 overflow-hidden transition-colors duration-200 ${activeIdx === i ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)]' : 'hover:bg-white/60'}`}>
+                    <div className="flex items-center gap-2 mb-5">
+                      <span className={`text-[10px] font-semibold tracking-[0.14em] uppercase tabular-nums ${activeIdx === i ? 'text-[#1a1918]' : 'text-[#c3bfb8]'}`}>
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      {sec.codes.length > 0 && (
+                        <span className="text-[10px] text-[#97938c] bg-[#f0ede8] px-2 py-0.5 rounded-full font-medium">
+                          코드 {sec.codes.length}개
+                        </span>
+                      )}
+                    </div>
+                    <MdWithImages>{sec.markdown}</MdWithImages>
+                  </div>
+                  {i < localSections.length - 1 && <div className="mx-4 my-2 border-b border-[#eceae5]" />}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* ── 편집 모드 ── */
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-[680px] mx-auto px-10 py-10 pb-40 space-y-3">
+              {editDraft.map((sec, i) => (
+                <div key={sec.id}
+                  className={`rounded-xl border bg-white transition-all duration-150 ${
+                    focusedSec === i
+                      ? 'border-[#1a1918] shadow-[0_1px_8px_rgba(0,0,0,0.08)]'
+                      : 'border-[#eceae5] hover:border-[#e4e1da]'
+                  }`}>
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-[#f5f4f0] cursor-pointer" onClick={() => setFocusedSec(i)}>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-semibold tracking-[0.14em] uppercase tabular-nums ${focusedSec === i ? 'text-[#1a1918]' : 'text-[#c3bfb8]'}`}>
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span className="text-[11px] text-[#c3bfb8]">
+                        {sec.codes.length > 0 ? `코드 ${sec.codes.length}개` : '이론 전용'}
+                      </span>
+                    </div>
+                    <button onClick={e => { e.stopPropagation(); removeSection(i); }}
+                      className="w-6 h-6 flex items-center justify-center rounded text-[#c3bfb8] hover:text-[#97938c] hover:bg-[#f5f4f0] transition-colors text-[14px]">×</button>
+                  </div>
+                  <div className="p-5">
+                    <textarea value={sec.markdown}
+                      onChange={e => updateMd(i, e.target.value)}
+                      onFocus={() => setFocusedSec(i)}
+                      placeholder="마크다운으로 이론 내용을 작성하세요"
+                      className={`w-full bg-[#f9f8f6] border rounded-lg p-4 text-[13.5px] text-[#1a1918] leading-[1.9] resize-none focus:outline-none transition-colors ${focusedSec === i ? 'border-[#d8d5cf]' : 'border-[#eceae5]'}`}
+                      rows={Math.max(5, sec.markdown.split('\n').length + 2)} />
+                  </div>
+                </div>
+              ))}
+              <button onClick={addSection}
+                className="w-full py-3 border border-dashed border-[#e4e1da] rounded-xl text-[12px] text-[#c3bfb8] hover:text-[#97938c] hover:border-[#d8d5cf] transition-colors">
+                + 섹션 추가
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══ 코드 패널 ══════════════════════════════ */}
+        <div className="w-[40%] flex-shrink-0 bg-white flex flex-col overflow-hidden border-l border-[#e4e1da]">
+
+          {/* 코드 패널 헤더 */}
+          <div className="flex-shrink-0 px-5 py-3.5 border-b border-[#eceae5] flex items-center justify-between bg-[#f9f8f6]">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold tracking-[0.14em] uppercase text-[#97938c]">
+                {rightSec?.language ?? 'Python'}
+              </span>
+              <span className="text-[#e4e1da]">·</span>
+              <span className="text-[11px] text-[#c3bfb8] tabular-nums">섹션 {String(rightIdx + 1).padStart(2, '0')}</span>
+            </div>
+            {!hasCodes && !isEditMode && (
+              <span className="text-[10px] text-[#d8d5cf] bg-[#f5f3ef] px-2 py-0.5 rounded-full">이론 섹션</span>
+            )}
+            {hasCodes && (
+              <span className="text-[10px] text-[#c3bfb8]">{rightSec?.codes.length}개 블록</span>
+            )}
+          </div>
+
+          {/* ── 뷰 모드: 코드 + 출력 ── */}
+          {!isEditMode ? (
+            <div key={codeKey} className="flex-1 overflow-y-auto animate-fadeIn">
+              {hasCodes ? (
+                <div className="p-5 space-y-4">
+                  {rightSec.codes.map((block: CodeBlock, ci: number) => {
+                    const cellKey  = `${rightIdx}-${ci}`;
+                    const runState = runStates[cellKey];
+                    const live     = liveOutputs[cellKey];
+                    const isRunning = runState === 'running';
+
+                    return (
+                    <div key={ci} className="rounded-xl border border-[#eceae5] overflow-hidden">
+                      {/* 코드 헤더 */}
+                      <div className="px-4 py-2 bg-[#f5f3ef] border-b border-[#eceae5] flex items-center justify-between">
+                        <span className="text-[10px] text-[#97938c] font-medium uppercase tracking-[0.1em]">
+                          {rightSec.codes.length > 1 ? `In [${ci + 1}]` : rightSec.language}
+                        </span>
+                        <button
+                          onClick={() => handleRun(rightIdx, ci, block.source)}
+                          disabled={isRunning}
+                          className={`flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-colors ${
+                            isRunning
+                              ? 'text-[#c3bfb8] cursor-not-allowed'
+                              : kernel.status === 'connected'
+                                ? 'text-[#2d7a3a] hover:bg-[#e6f4e9] hover:text-[#1a5228]'
+                                : 'text-[#97938c] hover:bg-[#eceae5] hover:text-[#1a1918]'
+                          }`}
+                          title={kernel.status === 'connected' ? 'Colab에서 실행' : 'Colab 연결 후 실행 가능'}
+                        >
+                          {isRunning ? (
+                            <>
+                              <span className="inline-block w-3 h-3 border-[1.5px] border-[#97938c] border-t-transparent rounded-full animate-spin" />
+                              실행 중
+                            </>
+                          ) : (
+                            <>▶ 실행</>
+                          )}
+                        </button>
+                      </div>
+                      {/* 코드 */}
+                      <div className="p-5 bg-[#f5f3ef]">
+                        <SyntaxHighlighter
+                          language={rightSec.language}
+                          style={warmLight}
+                          customStyle={{ background: 'transparent', padding: 0, margin: 0 }}
+                          wrapLongLines={false}>
+                          {block.source}
+                        </SyntaxHighlighter>
+                      </div>
+                      {/* 실행 결과: 라이브 우선, 없으면 노트북 정적 출력 */}
+                      {live
+                        ? <LiveOutputBlock result={live} />
+                        : <OutputBlock outputs={block.outputs} idx={ci} />
+                      }
+                    </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* 코드 없는 섹션 */
+                <div className="flex-1 flex flex-col p-6 gap-4">
+                  <div className="rounded-xl border border-[#eceae5] bg-[#f9f8f6] p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 rounded-lg bg-white border border-[#eceae5] flex items-center justify-center text-[16px]">📖</div>
+                      <div>
+                        <p className="text-[12px] font-semibold text-[#1a1918]">이론 설명 섹션</p>
+                        <p className="text-[11px] text-[#c3bfb8]">코드 예제 없음</p>
+                      </div>
+                    </div>
+                    <p className="text-[12.5px] text-[#97938c] leading-relaxed">
+                      이 섹션은 개념 설명으로 구성됩니다. 왼쪽 내용을 읽은 후 다음 섹션으로 넘어가세요.
+                    </p>
+                  </div>
+                  {keyPoints.length > 0 && (
+                    <div className="rounded-xl border border-[#eceae5] bg-white p-5">
+                      <p className="text-[10px] font-semibold text-[#c3bfb8] uppercase tracking-[0.14em] mb-3">핵심 개념</p>
+                      <ul className="space-y-2">
+                        {keyPoints.map((pt, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-[#d8d5cf] flex-shrink-0 mt-[3px] text-[8px]">▸</span>
+                            <span className="text-[13px] text-[#3a3835] leading-snug">{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {nextCodeIdx !== -1 && (
+                    <button onClick={() => scrollTo(nextCodeIdx)}
+                      className="w-full py-3 rounded-xl border border-dashed border-[#e4e1da] text-[12px] text-[#97938c] hover:bg-[#f5f3ef] hover:border-[#d8d5cf] hover:text-[#1a1918] transition-colors flex items-center justify-center gap-2">
+                      다음 코드 섹션으로 →
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── 편집 모드: 코드 textarea ── */
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
+              <span className="text-[11px] font-semibold text-[#97938c] uppercase tracking-[0.1em]">
+                섹션 {String(focusedSec + 1).padStart(2, '0')} 코드
+              </span>
+              {editDraft[focusedSec]?.codes.length === 0 && (
+                <div className="rounded-xl border border-dashed border-[#eceae5] p-6 text-center">
+                  <p className="text-[12px] text-[#c3bfb8]">코드 블록이 없습니다</p>
+                </div>
+              )}
+              {editDraft[focusedSec]?.codes.map((block: CodeBlock, ci: number) => (
+                <div key={ci} className="relative group rounded-xl border border-[#eceae5] overflow-hidden">
+                  {editDraft[focusedSec].codes.length > 1 && (
+                    <div className="px-4 py-2 bg-[#f5f3ef] border-b border-[#eceae5] flex items-center justify-between">
+                      <span className="text-[10px] text-[#97938c] font-medium uppercase tracking-[0.1em]">In [{ci + 1}]</span>
+                      <button onClick={() => removeCodeBlock(focusedSec, ci)}
+                        className="text-[11px] text-[#c3bfb8] hover:text-[#97938c] transition-colors">삭제</button>
+                    </div>
+                  )}
+                  {editDraft[focusedSec].codes.length === 1 && (
+                    <button onClick={() => removeCodeBlock(focusedSec, ci)}
+                      className="absolute top-2.5 right-3 text-[11px] text-[#d8d5cf] hover:text-[#97938c] transition-colors opacity-0 group-hover:opacity-100 z-10">삭제</button>
+                  )}
+                  <textarea value={block.source}
+                    onChange={e => updateCode(focusedSec, ci, e.target.value)}
+                    placeholder="# Python 코드를 입력하세요"
+                    spellCheck={false}
+                    className="w-full bg-[#f5f3ef] p-5 font-mono text-[13px] text-[#2d2a27] leading-[1.8] resize-none focus:outline-none focus:bg-[#f0ede8] transition-colors"
+                    rows={Math.max(5, block.source.split('\n').length + 2)} />
+                </div>
+              ))}
+              <button onClick={() => addCodeBlock(focusedSec)}
+                className="w-full py-2.5 border border-dashed border-[#e4e1da] rounded-xl text-[12px] text-[#c3bfb8] hover:text-[#97938c] hover:border-[#d8d5cf] transition-colors">
+                + 코드 블록 추가
+              </button>
+            </div>
+          )}
+
+          {/* 하단 네비게이션 (뷰 모드) */}
+          {!isEditMode && (
+            <div className="flex-shrink-0 border-t border-[#eceae5] px-5 py-3 flex items-center justify-between bg-[#f9f8f6]">
+              <button onClick={() => scrollTo(Math.max(0, activeIdx - 1))} disabled={activeIdx === 0}
+                className="text-[11px] text-[#c3bfb8] hover:text-[#97938c] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                ← 이전
+              </button>
+              <div className="flex gap-1">
+                {localSections.map((_, i) => (
+                  <button key={i} onClick={() => scrollTo(i)}
+                    className={`h-1.5 rounded-full transition-all duration-200 ${activeIdx === i ? 'bg-[#97938c] w-4' : 'bg-[#e4e1da] w-1.5 hover:bg-[#c3bfb8]'}`} />
+                ))}
+              </div>
+              <button onClick={() => scrollTo(Math.min(total - 1, activeIdx + 1))} disabled={activeIdx === total - 1}
+                className="text-[11px] text-[#c3bfb8] hover:text-[#97938c] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                다음 →
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

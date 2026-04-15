@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Noto_Sans_KR, Jost } from 'next/font/google';
 import './globals.css';
 import Header from '@/components/Header';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 const jost = Jost({
   subsets: ['latin'],
@@ -24,8 +25,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko" className={`${jost.variable} ${notoSansKR.variable}`}>
       <body>
-        <Header />
-        <main>{children}</main>
+        <AuthProvider>
+          <Header />
+          <main>{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );

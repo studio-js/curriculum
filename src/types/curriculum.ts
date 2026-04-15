@@ -5,6 +5,7 @@ export interface Lesson {
   hours: number;
   summary?: string;
   objectives?: string[];
+  notebookPath?: string; // 예: '/notebooks/python-basics-01.ipynb'
 }
 
 export interface Node {

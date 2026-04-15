@@ -12,6 +12,12 @@ import subprocess, threading, re, sys, io, traceback, base64
 
 # 패키지 설치
 subprocess.run(['pip','install','flask','flask-cors','-q'], capture_output=True)
+
+# matplotlib 백엔드를 Agg로 설정 (화면 없이 이미지 저장 가능)
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+plt.show = lambda *a, **k: None  # plt.show() 호출 시 그림이 사라지지 않도록
 subprocess.run(['wget','-q','-O','/tmp/cloudflared.deb',
     'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb'],
     capture_output=True)

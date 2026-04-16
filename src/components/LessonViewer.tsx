@@ -642,7 +642,7 @@ export default function LessonViewer({
         {/* ══ 이론 패널 ══ */}
         {!isEditMode ? (
           <div ref={leftRef} className="flex-1 overflow-y-auto">
-            <div className="max-w-[900px] mx-auto px-6 py-10 pb-40">
+            <div className={`mx-auto px-6 py-10 pb-40 transition-all duration-300 ${showCode ? 'max-w-[900px]' : 'max-w-[1200px]'}`}>
               {localSections.map((sec, i) => (
                 <div key={sec.id} ref={el => { sectionRefs.current[i] = el; }} className="mb-4 relative">
                   <div className={`absolute -left-4 top-0 bottom-0 w-[2px] rounded-full transition-all duration-300 ${activeIdx === i ? 'bg-[#1a1918] opacity-100' : 'opacity-0'}`} />
@@ -714,10 +714,10 @@ export default function LessonViewer({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowCode(false)}
-                className="text-[10px] font-medium text-[#97938c] hover:text-[#1a1918] px-2 py-1 rounded hover:bg-[#eceae5] transition-colors"
+                className="text-[10px] font-medium text-[#97938c] hover:text-[#1a1918] px-2 py-1 rounded hover:bg-[#eceae5] transition-colors flex items-center gap-1"
                 title="코드 패널 숨기기"
               >
-                ← 숨기기
+                닫기 ›
               </button>
               <span className="text-[#e4e1da]">·</span>
               <span className="text-[10px] font-semibold tracking-[0.14em] uppercase text-[#97938c]">
@@ -891,19 +891,14 @@ export default function LessonViewer({
         </div>
         ) : (
           /* 코드 패널 접힌 상태 — 클릭하면 다시 열림 */
-          <div className="flex-shrink-0 w-10 bg-[#f9f8f6] border-l border-[#e4e1da] flex flex-col items-center py-4 gap-3">
+          <div className="flex-shrink-0 w-9 bg-[#f9f8f6] border-l border-[#e4e1da] flex flex-col items-center justify-center">
             <button
               onClick={() => setShowCode(true)}
-              className="flex flex-col items-center gap-1.5 text-[#97938c] hover:text-[#1a1918] transition-colors group"
+              className="flex flex-col items-center gap-1 text-[#97938c] hover:text-[#1a1918] hover:bg-[#eceae5] transition-colors rounded-lg px-1 py-3 w-full"
               title="코드 패널 열기"
             >
-              <span className="text-[14px]">→</span>
-              <span
-                className="text-[9px] font-semibold tracking-[0.14em] uppercase text-[#97938c] group-hover:text-[#1a1918] transition-colors"
-                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-              >
-                코드
-              </span>
+              <span className="text-[13px] leading-none">‹</span>
+              <span className="text-[9px] font-semibold tracking-[0.1em] uppercase leading-none mt-0.5">코드</span>
             </button>
           </div>
         )}

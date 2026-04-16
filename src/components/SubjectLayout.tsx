@@ -263,7 +263,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                   <div className="text-[32px] mb-3">📭</div>
                   <p className="text-[13px] text-[#97938c]">업로드된 노트북이 없습니다</p>
                   {isAdmin && (
-                    <p className="text-[12px] text-[#c3bfb8] mt-1">
+                    <p className="text-[12px] text-[#97938c] mt-1">
                       각 세션에서 ↑ 노트북 연결 버튼으로 .ipynb 파일을 추가하세요
                     </p>
                   )}
@@ -273,10 +273,10 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                   {Object.entries(groupedNotebooks).map(([subjectTitle, books]) => (
                     <div key={subjectTitle}>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[10px] font-semibold text-[#c3bfb8] uppercase tracking-[0.16em]">
+                        <span className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.16em]">
                           {subjectTitle}
                         </span>
-                        <span className="text-[10px] text-[#e4e1da]">{books.length}개</span>
+                        <span className="text-[10px] text-[#97938c] font-medium">{books.length}개</span>
                       </div>
                       <div className="space-y-1 pl-0.5">
                         {books.map(nb => {
@@ -315,13 +315,13 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
             {/* 모달 푸터 */}
             {allNotebooks.length > 0 && (
               <div className="flex-shrink-0 px-6 py-4 border-t border-[#eceae5] flex items-center justify-between">
-                <span className="text-[11px] text-[#c3bfb8]">
+                <span className="text-[11px] text-[#97938c]">
                   총 {allNotebooks.length}개 파일 · Supabase Storage
                 </span>
                 {isAdmin && (
                   <button
                     onClick={deleteAllNotebooks}
-                    className="text-[11px] text-[#c3bfb8] hover:text-[#c04030] transition-colors"
+                    className="text-[11px] text-[#97938c] hover:text-[#c04030] transition-colors"
                   >
                     전체 삭제
                   </button>
@@ -400,7 +400,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                 <div className="text-left">
                   <p className="text-[12px] font-medium">노트북 관리</p>
                   {allNotebooks.length > 0 && (
-                    <p className="text-[10px] text-[#c3bfb8]">{allNotebooks.length}개 파일</p>
+                    <p className="text-[10px] text-[#97938c]">{allNotebooks.length}개 파일</p>
                   )}
                 </div>
               </button>
@@ -546,7 +546,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                           {isAdmin && (
                             <button
                               onClick={() => handleUploadClick(lesson)}
-                              className="mt-6 flex items-center gap-2 text-[12px] text-[#c3bfb8] hover:text-[#97938c] transition-colors group"
+                              className="mt-6 flex items-center gap-2 text-[12px] text-[#97938c] hover:text-[#1a1918] transition-colors group"
                             >
                               <span className="w-7 h-7 flex items-center justify-center border border-dashed border-[#d8d5cf] group-hover:border-[#97938c] rounded-lg transition-colors text-[14px]">↑</span>
                               <span>.ipynb 노트북 파일 연결하기</span>
@@ -570,7 +570,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                 >
                   ← 이전 노드
                 </button>
-                <span className="text-[12px] text-[#c3bfb8] tabular-nums">
+                <span className="text-[12px] text-[#97938c] tabular-nums font-medium">
                   {activeNode + 1} / {subject.nodes.length}
                 </span>
                 <button

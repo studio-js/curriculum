@@ -266,6 +266,7 @@ export default function LessonViewer({
   const [editDraft,     setEditDraft]     = useState<NotebookSection[]>(initialSections);
   const [focusedSec,    setFocusedSec]    = useState(0);
   const [hasLocalSave,  setHasLocalSave]  = useState(false);
+  const [showCode,      setShowCode]      = useState(true);
 
   /* ── Colab 커널 ── */
   const kernel = useColabKernel();
@@ -278,6 +279,8 @@ export default function LessonViewer({
   const sectionRefs     = useRef<(HTMLDivElement | null)[]>([]);
   const scrollLock      = useRef(false);
   const scrollLockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tocRef          = useRef<HTMLDivElement>(null);
+  const tocItemRefs     = useRef<(HTMLButtonElement | null)[]>([]);
 
   /* ── localStorage 로드 ──────────────────────────────
      저장된 편집 내용이 있으면 사용하되,
@@ -364,6 +367,20 @@ export default function LessonViewer({
     panel.addEventListener('scroll', updateActive, { passive: true });
     return () => panel.removeEventListener('scroll', updateActive);
   }, [isEditMode, updateActive]);
+
+  /* ── TOC 자동 스크롤: 활성 섹션이 바뀌면 목차 항목이 보이도록 ── */
+  useEffect(() => {
+    const toc  = tocRef.current;
+    const item = tocItemRefs.current[activeIdx];
+    if (!toc || !item) return;
+    const tocTop  = toc.scrollTop;
+    const tocH    = toc.clientHeight;
+    const itemTop = item.offsetTop;
+    const itemH   = item.offsetHeight;
+    if (itemTop < tocTop + 8 || itemTop + itemH > tocTop + tocH - 8) {
+      toc.scrollTo({ top: itemTop - tocH / 2 + itemH / 2, behavior: 'smooth' });
+    }
+  }, [activeIdx]);
 
   /* ── TOC 클릭: 즉시 하이라이트 + scroll lock ── */
   const scrollTo = useCallback((idx: number) => {
@@ -497,7 +514,7 @@ export default function LessonViewer({
             </button>
             <span className="text-[#e4e1da]">|</span>
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[12px] text-[#c3bfb8] truncate">{subjectTitle}</span>
+              <span className="text-[12px] text-[#97938c] truncate">{subjectTitle}</span>
               <span className="text-[#e4e1da] text-[10px]">/</span>
               <span className="text-[13px] font-semibold text-[#1a1918] truncate">{lessonTitle}</span>
             </div>
@@ -514,7 +531,7 @@ export default function LessonViewer({
         <div className="ml-auto flex items-center gap-2">
           {!isEditMode ? (
             <>
-              <span className="text-[11px] text-[#c3bfb8] tabular-nums mr-1">{activeIdx + 1} / {total}</span>
+              <span className="text-[11px] text-[#97938c] tabular-nums mr-1">{activeIdx + 1} / {total}</span>
               <div className="w-20 h-[3px] bg-[#eceae5] rounded-full overflow-hidden mr-2">
                 <div className="h-full bg-[#1a1918] rounded-full transition-all duration-300"
                      style={{ width: `${((activeIdx + 1) / total) * 100}%` }} />
@@ -589,9 +606,9 @@ export default function LessonViewer({
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── 목차 사이드바 ── */}
-        <aside className="w-52 flex-shrink-0 bg-white border-r border-[#e4e1da] overflow-y-auto hidden lg:block">
+        <aside ref={tocRef} className="w-52 flex-shrink-0 bg-white border-r border-[#e4e1da] overflow-y-auto hidden lg:block">
           <div className="px-4 py-6">
-            <p className="text-[10px] tracking-[0.18em] text-[#c3bfb8] uppercase mb-3 font-medium">목차</p>
+            <p className="text-[10px] tracking-[0.18em] text-[#97938c] uppercase mb-3 font-semibold">목차</p>
             <ul className="space-y-0.5">
               {viewSecs.map((sec, i) => {
                 const heading = sec.markdown.match(/^#{1,3}\s+(.+)/m)?.[1] ?? `섹션 ${i + 1}`;
@@ -599,13 +616,14 @@ export default function LessonViewer({
                 return (
                   <li key={sec.id}>
                     <button
+                      ref={el => { tocItemRefs.current[i] = el; }}
                       onClick={() => isEditMode ? setFocusedSec(i) : scrollTo(i)}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${isActive ? 'bg-[#f0ede8] text-[#1a1918]' : 'text-[#4a4845] hover:bg-[#f7f6f3]'}`}>
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${isActive ? 'bg-[#f0ede8] text-[#1a1918]' : 'text-[#3a3835] hover:bg-[#f7f6f3]'}`}>
                       <div className="flex items-start gap-2">
-                        <span className={`text-[10px] tabular-nums flex-shrink-0 font-medium mt-0.5 ${isActive ? 'text-[#97938c]' : 'text-[#c3bfb8]'}`}>
+                        <span className={`text-[10px] tabular-nums flex-shrink-0 font-bold mt-0.5 ${isActive ? 'text-[#1a1918]' : 'text-[#97938c]'}`}>
                           {String(i + 1).padStart(2, '0')}
                         </span>
-                        <p className={`text-[12px] leading-snug ${isActive ? 'font-medium' : ''}`}>{heading}</p>
+                        <p className={`text-[12px] leading-snug ${isActive ? 'font-semibold' : 'font-medium'}`}>{heading}</p>
                       </div>
                     </button>
                   </li>
@@ -614,7 +632,7 @@ export default function LessonViewer({
             </ul>
             {isEditMode && (
               <button onClick={addSection}
-                className="w-full mt-3 py-2 border border-dashed border-[#e4e1da] rounded-lg text-[11px] text-[#c3bfb8] hover:text-[#97938c] hover:border-[#d8d5cf] transition-colors">
+                className="w-full mt-3 py-2 border border-dashed border-[#e4e1da] rounded-lg text-[11px] text-[#97938c] hover:text-[#1a1918] hover:border-[#d8d5cf] transition-colors">
                 + 섹션 추가
               </button>
             )}
@@ -630,7 +648,7 @@ export default function LessonViewer({
                   <div className={`absolute -left-4 top-0 bottom-0 w-[2px] rounded-full transition-all duration-300 ${activeIdx === i ? 'bg-[#1a1918] opacity-100' : 'opacity-0'}`} />
                   <div className={`rounded-xl px-10 py-9 overflow-hidden transition-colors duration-200 ${activeIdx === i ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)]' : 'hover:bg-white/60'}`}>
                     <div className="flex items-center gap-2 mb-5">
-                      <span className={`text-[10px] font-semibold tracking-[0.14em] uppercase tabular-nums ${activeIdx === i ? 'text-[#1a1918]' : 'text-[#c3bfb8]'}`}>
+                      <span className={`text-[10px] font-semibold tracking-[0.14em] uppercase tabular-nums ${activeIdx === i ? 'text-[#1a1918]' : 'text-[#97938c]'}`}>
                         {String(i + 1).padStart(2, '0')}
                       </span>
                       {sec.codes.length > 0 && (
@@ -659,10 +677,10 @@ export default function LessonViewer({
                   }`}>
                   <div className="flex items-center justify-between px-5 py-3 border-b border-[#f5f4f0] cursor-pointer" onClick={() => setFocusedSec(i)}>
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-semibold tracking-[0.14em] uppercase tabular-nums ${focusedSec === i ? 'text-[#1a1918]' : 'text-[#c3bfb8]'}`}>
+                      <span className={`text-[10px] font-semibold tracking-[0.14em] uppercase tabular-nums ${focusedSec === i ? 'text-[#1a1918]' : 'text-[#97938c]'}`}>
                         {String(i + 1).padStart(2, '0')}
                       </span>
-                      <span className="text-[11px] text-[#c3bfb8]">
+                      <span className="text-[11px] text-[#97938c]">
                         {sec.codes.length > 0 ? `코드 ${sec.codes.length}개` : '이론 전용'}
                       </span>
                     </div>
@@ -680,7 +698,7 @@ export default function LessonViewer({
                 </div>
               ))}
               <button onClick={addSection}
-                className="w-full py-3 border border-dashed border-[#e4e1da] rounded-xl text-[12px] text-[#c3bfb8] hover:text-[#97938c] hover:border-[#d8d5cf] transition-colors">
+                className="w-full py-3 border border-dashed border-[#e4e1da] rounded-xl text-[12px] text-[#97938c] hover:text-[#1a1918] hover:border-[#d8d5cf] transition-colors">
                 + 섹션 추가
               </button>
             </div>
@@ -688,22 +706,31 @@ export default function LessonViewer({
         )}
 
         {/* ══ 코드 패널 ══════════════════════════════ */}
+        {showCode ? (
         <div className="w-[40%] flex-shrink-0 bg-white flex flex-col overflow-hidden border-l border-[#e4e1da]">
 
           {/* 코드 패널 헤더 */}
           <div className="flex-shrink-0 px-5 py-3.5 border-b border-[#eceae5] flex items-center justify-between bg-[#f9f8f6]">
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCode(false)}
+                className="text-[10px] font-medium text-[#97938c] hover:text-[#1a1918] px-2 py-1 rounded hover:bg-[#eceae5] transition-colors"
+                title="코드 패널 숨기기"
+              >
+                ← 숨기기
+              </button>
+              <span className="text-[#e4e1da]">·</span>
               <span className="text-[10px] font-semibold tracking-[0.14em] uppercase text-[#97938c]">
                 {rightSec?.language ?? 'Python'}
               </span>
               <span className="text-[#e4e1da]">·</span>
-              <span className="text-[11px] text-[#c3bfb8] tabular-nums">섹션 {String(rightIdx + 1).padStart(2, '0')}</span>
+              <span className="text-[11px] text-[#97938c] tabular-nums">섹션 {String(rightIdx + 1).padStart(2, '0')}</span>
             </div>
             {!hasCodes && !isEditMode && (
-              <span className="text-[10px] text-[#d8d5cf] bg-[#f5f3ef] px-2 py-0.5 rounded-full">이론 섹션</span>
+              <span className="text-[10px] text-[#97938c] bg-[#f0ede8] px-2 py-0.5 rounded-full">이론 섹션</span>
             )}
             {hasCodes && (
-              <span className="text-[10px] text-[#c3bfb8]">{rightSec?.codes.length}개 블록</span>
+              <span className="text-[10px] text-[#97938c] font-medium">{rightSec?.codes.length}개 블록</span>
             )}
           </div>
 
@@ -774,7 +801,7 @@ export default function LessonViewer({
                       <div className="w-8 h-8 rounded-lg bg-white border border-[#eceae5] flex items-center justify-center text-[16px]">📖</div>
                       <div>
                         <p className="text-[12px] font-semibold text-[#1a1918]">이론 설명 섹션</p>
-                        <p className="text-[11px] text-[#c3bfb8]">코드 예제 없음</p>
+                        <p className="text-[11px] text-[#97938c]">코드 예제 없음</p>
                       </div>
                     </div>
                     <p className="text-[12.5px] text-[#97938c] leading-relaxed">
@@ -783,7 +810,7 @@ export default function LessonViewer({
                   </div>
                   {keyPoints.length > 0 && (
                     <div className="rounded-xl border border-[#eceae5] bg-white p-5">
-                      <p className="text-[10px] font-semibold text-[#c3bfb8] uppercase tracking-[0.14em] mb-3">핵심 개념</p>
+                      <p className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.14em] mb-3">핵심 개념</p>
                       <ul className="space-y-2">
                         {keyPoints.map((pt, i) => (
                           <li key={i} className="flex items-start gap-2">
@@ -811,7 +838,7 @@ export default function LessonViewer({
               </span>
               {editDraft[focusedSec]?.codes.length === 0 && (
                 <div className="rounded-xl border border-dashed border-[#eceae5] p-6 text-center">
-                  <p className="text-[12px] text-[#c3bfb8]">코드 블록이 없습니다</p>
+                  <p className="text-[12px] text-[#97938c]">코드 블록이 없습니다</p>
                 </div>
               )}
               {editDraft[focusedSec]?.codes.map((block: CodeBlock, ci: number) => (
@@ -836,7 +863,7 @@ export default function LessonViewer({
                 </div>
               ))}
               <button onClick={() => addCodeBlock(focusedSec)}
-                className="w-full py-2.5 border border-dashed border-[#e4e1da] rounded-xl text-[12px] text-[#c3bfb8] hover:text-[#97938c] hover:border-[#d8d5cf] transition-colors">
+                className="w-full py-2.5 border border-dashed border-[#e4e1da] rounded-xl text-[12px] text-[#97938c] hover:text-[#1a1918] hover:border-[#d8d5cf] transition-colors">
                 + 코드 블록 추가
               </button>
             </div>
@@ -846,22 +873,40 @@ export default function LessonViewer({
           {!isEditMode && (
             <div className="flex-shrink-0 border-t border-[#eceae5] px-5 py-3 flex items-center justify-between bg-[#f9f8f6]">
               <button onClick={() => scrollTo(Math.max(0, activeIdx - 1))} disabled={activeIdx === 0}
-                className="text-[11px] text-[#c3bfb8] hover:text-[#97938c] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                className="text-[11px] text-[#97938c] hover:text-[#1a1918] disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-medium">
                 ← 이전
               </button>
               <div className="flex gap-1">
                 {localSections.map((_, i) => (
                   <button key={i} onClick={() => scrollTo(i)}
-                    className={`h-1.5 rounded-full transition-all duration-200 ${activeIdx === i ? 'bg-[#97938c] w-4' : 'bg-[#e4e1da] w-1.5 hover:bg-[#c3bfb8]'}`} />
+                    className={`h-1.5 rounded-full transition-all duration-200 ${activeIdx === i ? 'bg-[#1a1918] w-4' : 'bg-[#c3bfb8] w-1.5 hover:bg-[#97938c]'}`} />
                 ))}
               </div>
               <button onClick={() => scrollTo(Math.min(total - 1, activeIdx + 1))} disabled={activeIdx === total - 1}
-                className="text-[11px] text-[#c3bfb8] hover:text-[#97938c] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                className="text-[11px] text-[#97938c] hover:text-[#1a1918] disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-medium">
                 다음 →
               </button>
             </div>
           )}
         </div>
+        ) : (
+          /* 코드 패널 접힌 상태 — 클릭하면 다시 열림 */
+          <div className="flex-shrink-0 w-10 bg-[#f9f8f6] border-l border-[#e4e1da] flex flex-col items-center py-4 gap-3">
+            <button
+              onClick={() => setShowCode(true)}
+              className="flex flex-col items-center gap-1.5 text-[#97938c] hover:text-[#1a1918] transition-colors group"
+              title="코드 패널 열기"
+            >
+              <span className="text-[14px]">→</span>
+              <span
+                className="text-[9px] font-semibold tracking-[0.14em] uppercase text-[#97938c] group-hover:text-[#1a1918] transition-colors"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+              >
+                코드
+              </span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -366,12 +366,17 @@ export default function LessonViewer({
   /* ── 섹션 변경 시 포커스 초기화 ── */
   useEffect(() => { setFocusedCell(null); }, [activeIdx, focusedSec]);
 
-  /* ── 방향키: 셀 포커스 있으면 셀 이동, 없으면 섹션 이동 ── */
+  /* ── 방향키: 셀 포커스 있으면 셀 이동, 없으면 섹션 이동 / 좌우 → 코드 패널 토글 ── */
   useEffect(() => {
     if (isEditMode) return;
     const h = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      /* → 코드 패널 닫기 / ← 코드 패널 열기 */
+      if (e.key === 'ArrowRight') { e.preventDefault(); setShowCode(false); return; }
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); setShowCode(true);  return; }
+
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
 
       const dir = e.key === 'ArrowDown' ? 1 : -1;
       const secs = localSections;

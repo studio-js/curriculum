@@ -20,6 +20,7 @@ type ViewerState = { lesson: Lesson; sections: NotebookSection[] } | null;
 interface StoredNotebook {
   subjectTitle: string;
   lessonTitle:  string;
+  storagePath:  string;
 }
 
 /* ── 커리큘럼 전체에서 레슨 순서 인덱스 계산 ── */
@@ -85,7 +86,11 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
   async function loadNotebookList() {
     setNbLoading(true);
     const { data } = await listNotebooks();
-    setAllNotebooks(data.map(d => ({ subjectTitle: d.subject_title, lessonTitle: d.lesson_title })));
+    setAllNotebooks(data.map(d => ({
+      subjectTitle: d.subject_title,
+      lessonTitle:  d.lesson_title,
+      storagePath:  d.storage_path,
+    })));
     setNbLoading(false);
   }
 
@@ -123,8 +128,11 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
         const nb  = await res.json();
         sections  = parseNotebook(nb);
       } else {
-        /* Supabase Storage에서 다운로드 */
-        const { data, error } = await downloadNotebook(subject.title, lesson.title);
+        /* Supabase Storage에서 다운로드 — DB에 저장된 경로 우선 사용 */
+        const stored = allNotebooks.find(
+          nb => nb.subjectTitle === subject.title && nb.lessonTitle === lesson.title,
+        );
+        const { data, error } = await downloadNotebook(subject.title, lesson.title, stored?.storagePath);
         if (error || !data) {
           alert('노트북을 불러오지 못했습니다: ' + (error ?? '알 수 없는 오류'));
           return;
@@ -138,7 +146,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
     } finally {
       setLoadingLesson(null);
     }
-  }, [subject.title]);
+  }, [subject.title, allNotebooks]);
 
   /* ── 파일 업로드 ── */
   function handleUploadClick(lesson: Lesson) {
@@ -158,16 +166,16 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
         const sections = parseNotebook(nb);
         const json     = JSON.stringify(sections);
 
-        const { error } = await uploadNotebook(subject.title, lesson.title, json);
-        if (error) {
-          alert('업로드 실패: ' + error);
+        const { error, path } = await uploadNotebook(subject.title, lesson.title, json);
+        if (error || !path) {
+          alert('업로드 실패: ' + (error ?? '알 수 없는 오류'));
           return;
         }
 
-        /* 목록 갱신 */
+        /* 목록 갱신 — storagePath를 함께 저장해야 삭제/다운로드 시 정확한 경로 사용 가능 */
         setAllNotebooks(prev => {
           const filtered = prev.filter(nb => !(nb.subjectTitle === subject.title && nb.lessonTitle === lesson.title));
-          return [...filtered, { subjectTitle: subject.title, lessonTitle: lesson.title }];
+          return [...filtered, { subjectTitle: subject.title, lessonTitle: lesson.title, storagePath: path }];
         });
 
         setViewer({ lesson, sections });
@@ -181,7 +189,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
 
   /* ── 노트북 삭제 ── */
   async function deleteNotebook(nb: StoredNotebook) {
-    await deleteNotebookRemote(nb.subjectTitle, nb.lessonTitle);
+    await deleteNotebookRemote(nb.subjectTitle, nb.lessonTitle, nb.storagePath);
     setAllNotebooks(prev => prev.filter(
       n => !(n.subjectTitle === nb.subjectTitle && n.lessonTitle === nb.lessonTitle),
     ));
@@ -190,7 +198,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
 
   async function deleteAllNotebooks() {
     if (!confirm(`업로드된 노트북 ${allNotebooks.length}개를 모두 삭제할까요?`)) return;
-    await Promise.all(allNotebooks.map(nb => deleteNotebookRemote(nb.subjectTitle, nb.lessonTitle)));
+    await Promise.all(allNotebooks.map(nb => deleteNotebookRemote(nb.subjectTitle, nb.lessonTitle, nb.storagePath)));
     setAllNotebooks([]);
     setViewer(null);
     setShowManager(false);

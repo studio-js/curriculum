@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Subject, Lesson } from '@/types/curriculum';
+import { curriculumData } from '@/data/curriculum';
 import { parseNotebook, NotebookSection } from '@/lib/notebookParser';
 import LessonViewer from '@/components/LessonViewer';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -19,6 +20,33 @@ type ViewerState = { lesson: Lesson; sections: NotebookSection[] } | null;
 interface StoredNotebook {
   subjectTitle: string;
   lessonTitle:  string;
+}
+
+/* ── 커리큘럼 전체에서 레슨 순서 인덱스 계산 ── */
+function getLessonIndex(subjectTitle: string, lessonTitle: string): number {
+  let idx = 0;
+  for (const subj of curriculumData.subjects) {
+    for (const node of subj.nodes) {
+      for (const lesson of node.lessons) {
+        if (subj.title === subjectTitle && lesson.title === lessonTitle) return idx;
+        idx++;
+      }
+    }
+  }
+  return 9999;
+}
+
+function getLessonNumber(subjectTitle: string, lessonTitle: string): number | null {
+  let num = 1;
+  for (const subj of curriculumData.subjects) {
+    for (const node of subj.nodes) {
+      for (const lesson of node.lessons) {
+        if (subj.title === subjectTitle && lesson.title === lessonTitle) return num;
+        num++;
+      }
+    }
+  }
+  return null;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -61,15 +89,20 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
     setNbLoading(false);
   }
 
-  /* ── 과정별 그룹 ── */
-  const groupedNotebooks: Record<string, StoredNotebook[]> = useMemo(() => {
+  /* ── 커리큘럼 순서 기반 정렬 + 과정별 그룹 ── */
+  const sortedNotebooks = useMemo(() =>
+    [...allNotebooks].sort((a, b) =>
+      getLessonIndex(a.subjectTitle, a.lessonTitle) - getLessonIndex(b.subjectTitle, b.lessonTitle)
+    ), [allNotebooks]);
+
+  const groupedNotebooks = useMemo(() => {
     const g: Record<string, StoredNotebook[]> = {};
-    for (const nb of allNotebooks) {
+    for (const nb of sortedNotebooks) {
       if (!g[nb.subjectTitle]) g[nb.subjectTitle] = [];
       g[nb.subjectTitle].push(nb);
     }
     return g;
-  }, [allNotebooks]);
+  }, [sortedNotebooks]);
 
   /* ── 레슨에 노트북 있는지 확인 ── */
   function hasUploaded(lesson: Lesson): boolean {
@@ -246,25 +279,32 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                         <span className="text-[10px] text-[#e4e1da]">{books.length}개</span>
                       </div>
                       <div className="space-y-1 pl-0.5">
-                        {books.map(nb => (
+                        {books.map(nb => {
+                          const num = getLessonNumber(nb.subjectTitle, nb.lessonTitle);
+                          return (
                           <div
                             key={`${nb.subjectTitle}::${nb.lessonTitle}`}
                             className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#f9f8f6] hover:bg-[#f0ede8] group transition-colors"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="text-[14px] flex-shrink-0">📓</span>
-                              <span className="text-[13px] text-[#1a1918] truncate">{nb.lessonTitle}</span>
+                              {num !== null && (
+                                <span className="text-[11px] font-bold text-[#97938c] tabular-nums flex-shrink-0 w-6 text-center">
+                                  {String(num).padStart(2, '0')}
+                                </span>
+                              )}
+                              <span className="text-[13px] text-[#1a1918] font-medium truncate">{nb.lessonTitle}</span>
                             </div>
                             {isAdmin && (
                               <button
                                 onClick={() => deleteNotebook(nb)}
-                                className="text-[11px] text-[#d8d5cf] hover:text-[#c04030] transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 ml-3 font-medium"
+                                className="text-[11px] text-[#97938c] hover:text-[#c04030] transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 ml-3 font-medium"
                               >
                                 삭제
                               </button>
                             )}
                           </div>
-                        ))}
+                        );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -306,18 +346,18 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
               </Link>
 
               <div className="mb-6 pb-6 border-b border-[#eceae5]">
-                <p className="text-[10px] tracking-[0.18em] text-[#c3bfb8] uppercase mb-2 font-medium">
+                <span className="inline-block text-[10px] font-semibold tracking-[0.14em] uppercase px-2 py-0.5 rounded bg-[#f0ede8] text-[#3a3835] mb-2">
                   {subject.category}
-                </p>
-                <h1 className="text-[14px] font-semibold text-[#1a1918] leading-snug mb-3">
+                </span>
+                <h1 className="text-[14px] font-semibold text-[#1a1918] leading-snug mb-2">
                   {subject.title}
                 </h1>
-                <p className="text-[11px] text-[#97938c]">
+                <p className="text-[12px] text-[#3a3835] font-medium">
                   {subject.totalHours}h · {totalLessons}개 세션
                 </p>
               </div>
 
-              <p className="text-[10px] tracking-[0.18em] text-[#c3bfb8] uppercase mb-3 font-medium">
+              <p className="text-[11px] tracking-[0.14em] text-[#3a3835] uppercase mb-3 font-semibold">
                 노드
               </p>
               <ul className="space-y-0.5">
@@ -326,18 +366,18 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                     <button
                       onClick={() => { setActiveNode(i); setActiveLesson(null); }}
                       className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors ${
-                        activeNode === i ? 'bg-[#f0ede8] text-[#1a1918]' : 'text-[#4a4845] hover:bg-[#f7f6f3]'
+                        activeNode === i ? 'bg-[#f0ede8]' : 'hover:bg-[#f7f6f3]'
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <span className={`text-[10px] tabular-nums flex-shrink-0 font-medium ${activeNode === i ? 'text-[#97938c]' : 'text-[#c3bfb8]'}`}>
+                        <span className={`text-[11px] tabular-nums flex-shrink-0 font-bold ${activeNode === i ? 'text-[#1a1918]' : 'text-[#97938c]'}`}>
                           {String(i + 1).padStart(2, '0')}
                         </span>
                         <div className="min-w-0">
                           <p className={`text-[12px] font-medium leading-snug truncate ${activeNode === i ? 'text-[#1a1918]' : 'text-[#3a3835]'}`}>
                             {n.title}
                           </p>
-                          <p className={`text-[11px] mt-0.5 tabular-nums ${activeNode === i ? 'text-[#97938c]' : 'text-[#c3bfb8]'}`}>
+                          <p className={`text-[11px] mt-0.5 tabular-nums font-medium ${activeNode === i ? 'text-[#3a3835]' : 'text-[#97938c]'}`}>
                             {n.lessons.length}세션 · {n.hours}h
                           </p>
                         </div>
@@ -375,7 +415,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
             {/* 노드 헤더 */}
             <div className="mb-7">
               {subject.nodes.length > 1 && (
-                <p className="text-[10px] tracking-[0.2em] text-[#c3bfb8] uppercase mb-3 font-medium">
+                <p className="text-[11px] tracking-[0.14em] text-[#3a3835] uppercase mb-3 font-semibold">
                   노드 {String(activeNode + 1).padStart(2, '0')} / {subject.nodes.length}
                 </p>
               )}
@@ -402,10 +442,10 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
             {/* 세션 목록 */}
             <div className="bg-white rounded-2xl border border-[#e4e1da] overflow-hidden">
               <div className="flex items-center justify-between px-8 py-4 border-b border-[#eceae5]">
-                <h3 className="text-[12px] font-semibold text-[#1a1918] tracking-[0.08em] uppercase">
+                <h3 className="text-[13px] font-bold text-[#1a1918] tracking-[0.06em] uppercase">
                   세션 구성
                 </h3>
-                <span className="text-[12px] text-[#c3bfb8] tabular-nums">
+                <span className="text-[12px] text-[#3a3835] tabular-nums font-medium">
                   {node.lessons.length}개 세션
                 </span>
               </div>
@@ -423,7 +463,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                     <div className={`w-full flex items-center gap-4 px-8 py-4 transition-colors ${open && !canOpen ? 'bg-[#f7f6f3]' : 'hover:bg-[#f7f6f3]'}`}>
 
                       {/* 번호 */}
-                      <span className={`text-[11px] tabular-nums flex-shrink-0 w-5 font-medium ${open ? 'text-[#1a1918]' : 'text-[#d8d5cf]'}`}>
+                      <span className={`text-[12px] tabular-nums flex-shrink-0 w-6 font-bold ${open ? 'text-[#1a1918]' : 'text-[#97938c]'}`}>
                         {String(i + 1).padStart(2, '0')}
                       </span>
 
@@ -476,7 +516,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                         </span>
 
                         {!canOpen && hasDetail && (
-                          <button onClick={() => toggleLesson(i)} className="text-[10px] text-[#c3bfb8] w-4">
+                          <button onClick={() => toggleLesson(i)} className="text-[12px] text-[#97938c] w-4">
                             {open ? '▲' : '▼'}
                           </button>
                         )}

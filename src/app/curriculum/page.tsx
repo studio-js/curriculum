@@ -27,7 +27,7 @@ export default function CurriculumPage() {
 
       <section className="py-12">
         <h1 className="text-[30px] font-bold text-[#1a1918] tracking-tight mb-2">커리큘럼</h1>
-        <p className="text-[14px] text-[#97938c]">{subjects.length}개 교과목 · {totalSessions}개 세션 · 총 {totalHours}h</p>
+        <p className="text-[14px] text-[#3a3835] font-medium">{subjects.length}개 교과목 · {totalSessions}개 세션 · 총 {totalHours}h</p>
       </section>
 
       <div className="space-y-14 pb-20">
@@ -41,9 +41,9 @@ export default function CurriculumPage() {
               <div className="flex items-end justify-between mb-5 pb-4 border-b border-[#e4e1da]">
                 <div>
                   <h2 className="text-[20px] font-bold text-[#1a1918] mb-1">{cat}</h2>
-                  <p className="text-[13px] text-[#97938c]">{categoryMeta[cat].desc}</p>
+                  <p className="text-[13px] text-[#3a3835]">{categoryMeta[cat].desc}</p>
                 </div>
-                <span className="text-[13px] text-[#c3bfb8] tabular-nums flex-shrink-0 ml-4 font-medium">{catHours}h</span>
+                <span className="text-[13px] text-[#3a3835] tabular-nums flex-shrink-0 ml-4 font-semibold">{catHours}h</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -60,10 +60,10 @@ export default function CurriculumPage() {
                       {/* Card top */}
                       <div className="p-5 flex-1">
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-medium text-[#c3bfb8] tracking-[0.14em] uppercase">
+                          <span className="text-[10px] font-semibold text-[#3a3835] tracking-[0.14em] uppercase bg-[#f0ede8] px-2 py-0.5 rounded">
                             {subject.nodes.length > 1 ? `${subject.nodes.length}개 노드` : '단일 노드'}
                           </span>
-                          <span className="text-[13px] font-bold text-[#3a3835] tabular-nums">{subject.totalHours}h</span>
+                          <span className="text-[13px] font-bold text-[#1a1918] tabular-nums">{subject.totalHours}h</span>
                         </div>
 
                         <h3 className="text-[15px] font-semibold text-[#1a1918] leading-snug mb-4 group-hover:text-[#000]">
@@ -76,10 +76,10 @@ export default function CurriculumPage() {
                             {subject.nodes.map((node, ni) => (
                               <li key={node.id} className="flex items-center justify-between gap-2">
                                 <span className="flex items-center gap-2 min-w-0">
-                                  <span className="text-[10px] text-[#c3bfb8] tabular-nums flex-shrink-0">{String(ni + 1).padStart(2, '0')}</span>
-                                  <span className="text-[12px] text-[#1a1918] truncate">{node.title}</span>
+                                  <span className="text-[11px] text-[#97938c] tabular-nums flex-shrink-0 font-bold">{String(ni + 1).padStart(2, '0')}</span>
+                                  <span className="text-[12px] text-[#1a1918] font-medium truncate">{node.title}</span>
                                 </span>
-                                <span className="text-[11px] text-[#c3bfb8] tabular-nums flex-shrink-0">{node.hours}h</span>
+                                <span className="text-[11px] text-[#3a3835] tabular-nums flex-shrink-0 font-medium">{node.hours}h</span>
                               </li>
                             ))}
                           </ul>
@@ -87,7 +87,7 @@ export default function CurriculumPage() {
 
                         {/* 단일 노드 — 설명 */}
                         {subject.nodes.length === 1 && (
-                          <p className="text-[12px] text-[#1a1918] leading-[1.75] mb-4">
+                          <p className="text-[13px] text-[#1a1918] leading-[1.75] mb-4">
                             {subject.nodes[0].description.slice(0, 72)}…
                           </p>
                         )}
@@ -95,7 +95,7 @@ export default function CurriculumPage() {
                         {/* Topics */}
                         <div className="flex flex-wrap gap-1.5">
                           {allTopics.map((t) => (
-                            <span key={t} className="text-[11px] text-[#3a3835] bg-[#f7f6f3] border border-[#e4e1da] px-2 py-0.5 rounded-md">
+                            <span key={t} className="text-[11px] text-[#1a1918] bg-[#f0ede8] border border-[#e4e1da] px-2 py-0.5 rounded-md font-medium">
                               {t}
                             </span>
                           ))}
@@ -104,8 +104,8 @@ export default function CurriculumPage() {
 
                       {/* Card footer */}
                       <div className="flex items-center justify-between px-5 py-3 bg-[#f7f6f3] border-t border-[#eceae5]">
-                        <span className="text-[11px] text-[#c3bfb8] font-medium">{sessions}개 세션</span>
-                        <span className="text-[12px] text-[#c3bfb8] group-hover:text-[#3a3835] transition-colors">보기 →</span>
+                        <span className="text-[12px] text-[#3a3835] font-medium">{sessions}개 세션</span>
+                        <span className="text-[12px] text-[#3a3835] font-semibold group-hover:text-[#1a1918] transition-colors">보기 →</span>
                       </div>
                     </Link>
                   );

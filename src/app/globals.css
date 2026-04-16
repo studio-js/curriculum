@@ -19,6 +19,7 @@
   /* Font stacks */
   --font-body: var(--font-display), var(--font-sans), sans-serif;
   --font-num: var(--font-display), sans-serif;
+  --font-serif: var(--font-serif), Georgia, serif;
 }
 
 @keyframes fadeIn {

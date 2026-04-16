@@ -15,14 +15,14 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-[#e4e1da]">
-      <div className="max-w-5xl mx-auto px-8 h-14 flex items-center justify-between">
-        <Link href="/" className="text-[13px] font-semibold text-[#1a1918] tracking-[0.04em] uppercase">
+    <header className="sticky top-0 z-50 bg-white border-b border-[#ece9e3]">
+      <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
+        <Link href="/" className="text-[11px] font-semibold text-[#1a1918] tracking-[0.18em] uppercase">
           AI 데이터 인텔리전스
         </Link>
 
-        <div className="flex items-center gap-6">
-          <nav className="flex items-center gap-7">
+        <div className="flex items-center gap-8">
+          <nav className="flex items-center gap-8">
             {[
               { href: '/',           label: '개요' },
               { href: '/curriculum', label: '커리큘럼' },
@@ -30,10 +30,10 @@ export default function Header() {
               <Link
                 key={href}
                 href={href}
-                className={`text-[13px] tracking-[0.02em] transition-colors ${
+                className={`text-[12px] tracking-[0.04em] transition-colors ${
                   pathname === href
-                    ? 'text-[#1a1918] font-semibold'
-                    : 'text-[#97938c] hover:text-[#1a1918]'
+                    ? 'text-[#1a1918] font-medium'
+                    : 'text-[#97938c] hover:text-[#3a3835]'
                 }`}
               >
                 {label}
@@ -45,20 +45,15 @@ export default function Header() {
           {configured && !loading && (
             user ? (
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-[#1a1918] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-                    {(profile?.email ?? user.email ?? '?')[0].toUpperCase()}
-                  </span>
-                  <div className="text-right hidden sm:block">
-                    <p className="text-[11px] font-medium text-[#1a1918] leading-none">
-                      {profile?.email ?? user.email}
-                    </p>
-                    {profile?.role && (
-                      <p className="text-[10px] text-[#c3bfb8] mt-0.5">
-                        {profile.role === 'admin' ? '관리자' : '수강생'}
-                      </p>
-                    )}
-                  </div>
+                <div className="hidden sm:flex items-center gap-2">
+                  <p className="text-[12px] font-medium text-[#1a1918]">
+                    {profile?.email ?? user.email}
+                  </p>
+                  {profile?.role && (
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[#c3bfb8] text-[#3a3835] leading-none tracking-[0.04em]">
+                      {profile.role === 'admin' ? '관리자' : '수강생'}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={handleLogout}
@@ -70,7 +65,7 @@ export default function Header() {
             ) : (
               <Link
                 href="/login"
-                className="text-[12px] font-medium px-4 py-1.5 rounded-lg bg-[#1a1918] text-white hover:bg-[#3a3835] transition-colors"
+                className="text-[11px] font-medium px-4 py-1.5 rounded border border-[#1a1918] text-[#1a1918] hover:bg-[#1a1918] hover:text-white transition-colors tracking-[0.04em]"
               >
                 로그인
               </Link>

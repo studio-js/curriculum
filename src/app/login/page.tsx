@@ -72,7 +72,7 @@ export default function LoginPage() {
             className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-[#e4e1da] bg-white hover:bg-[#f7f6f3] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {googleBusy ? (
-              <span className="inline-block w-4 h-4 border-2 border-[#d8d5cf] border-t-[#1a1918] rounded-full animate-spin" />
+              <span className="inline-block w-4 h-4 border-2 border-[#c3bfb8] border-t-[#1a1918] rounded-full animate-spin" />
             ) : (
               /* Google 로고 SVG */
               <svg width="18" height="18" viewBox="0 0 18 18">
@@ -136,7 +136,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={busy || googleBusy || !email.trim() || !password}
-              className="w-full py-3 rounded-xl bg-[#1a1918] text-white text-[14px] font-semibold tracking-[0.02em] hover:bg-[#3a3835] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl border border-[#1a1918] text-[#1a1918] text-[14px] font-semibold tracking-[0.02em] hover:bg-[#1a1918] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {busy ? (
                 <>

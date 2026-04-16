@@ -235,7 +235,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
           onClick={() => setShowManager(false)}
         >
           <div
-            className="bg-white rounded-2xl w-[480px] max-h-[72vh] flex flex-col shadow-2xl border border-[#e4e1da]"
+            className="bg-white rounded w-[480px] max-h-[72vh] flex flex-col shadow-xl border border-[#e4e1da]"
             onClick={e => e.stopPropagation()}
           >
             {/* 모달 헤더 */}
@@ -252,7 +252,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
               </div>
               <button
                 onClick={() => setShowManager(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[#97938c] hover:text-[#1a1918] hover:bg-[#f0ede8] transition-colors text-[20px] leading-none"
+                className="w-7 h-7 flex items-center justify-center rounded text-[#97938c] hover:text-[#1a1918] hover:bg-[#f0ede8] transition-colors text-[20px] leading-none"
               >×</button>
             </div>
 
@@ -284,7 +284,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                           return (
                           <div
                             key={`${nb.subjectTitle}::${nb.lessonTitle}`}
-                            className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#f9f8f6] hover:bg-[#f0ede8] group transition-colors"
+                            className="flex items-center justify-between px-3 py-2.5 rounded bg-[#f9f8f6] hover:bg-[#f0ede8] group transition-colors"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               {num !== null && (
@@ -365,7 +365,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                   <li key={n.id}>
                     <button
                       onClick={() => { setActiveNode(i); setActiveLesson(null); }}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors ${
+                      className={`w-full text-left px-3 py-2.5 rounded transition-colors ${
                         activeNode === i ? 'bg-[#f0ede8]' : 'hover:bg-[#f7f6f3]'
                       }`}
                     >
@@ -392,9 +392,9 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
             <div className="mt-auto pt-5 border-t border-[#eceae5]">
               <button
                 onClick={() => setShowManager(true)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[#97938c] hover:bg-[#f7f6f3] hover:text-[#1a1918] transition-colors group"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded text-[#97938c] hover:bg-[#f7f6f3] hover:text-[#1a1918] transition-colors group"
               >
-                <span className="w-6 h-6 flex items-center justify-center rounded-md bg-[#f0ede8] group-hover:bg-[#e4e1da] transition-colors text-[12px]">
+                <span className="w-6 h-6 flex items-center justify-center rounded bg-[#f0ede8] group-hover:bg-[#e4e1da] transition-colors text-[12px]">
                   📁
                 </span>
                 <div className="text-left">
@@ -427,12 +427,12 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                 <span className="text-[#e4e1da]">·</span>
                 <span className="text-[13px] text-[#97938c]">{node.lessons.length}개 세션</span>
               </div>
-              <p className="text-[15px] text-[#1a1918] leading-[1.9] max-w-2xl mb-6">
+              <p className="text-[15px] text-[#3a3835] leading-[1.9] max-w-2xl mb-6">
                 {node.description}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {node.topics.map(t => (
-                  <span key={t} className="text-[12px] text-[#3a3835] bg-white border border-[#e4e1da] px-3 py-1 rounded-full">
+                  <span key={t} className="text-[12px] text-[#58554f] bg-white border border-[#e4e1da] px-3 py-1 rounded">
                     {t}
                   </span>
                 ))}
@@ -440,7 +440,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
             </div>
 
             {/* 세션 목록 */}
-            <div className="bg-white rounded-2xl border border-[#e4e1da] overflow-hidden">
+            <div className="bg-white border border-[#e4e1da] overflow-hidden">
               <div className="flex items-center justify-between px-8 py-4 border-b border-[#eceae5]">
                 <h3 className="text-[13px] font-bold text-[#1a1918] tracking-[0.06em] uppercase">
                   세션 구성
@@ -486,8 +486,8 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                         {canOpen && (
                           <button
                             onClick={() => openNotebook(lesson)}
-                            className={`text-[10px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1 transition-colors ${
-                              isLoading ? 'bg-[#f0ede8] text-[#97938c]' : 'bg-[#1a1918] text-white hover:bg-[#3a3835]'
+                            className={`text-[10px] font-medium px-2.5 py-1 rounded flex items-center gap-1 transition-colors ${
+                              isLoading ? 'bg-[#f0ede8] text-[#97938c]' : 'border border-[#1a1918] text-[#1a1918] hover:bg-[#f0ede8]'
                             }`}
                           >
                             {isLoading ? (
@@ -503,14 +503,14 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                         {!canOpen && isAdmin && (
                           <button
                             onClick={() => handleUploadClick(lesson)}
-                            className="text-[10px] font-medium px-2.5 py-1 rounded-full border border-dashed border-[#d8d5cf] text-[#c3bfb8] hover:border-[#97938c] hover:text-[#97938c] transition-colors flex items-center gap-1"
+                            className="text-[10px] font-medium px-2.5 py-1 rounded border border-dashed border-[#c3bfb8] text-[#97938c] hover:border-[#97938c] hover:text-[#1a1918] transition-colors flex items-center gap-1"
                           >
                             <span>↑</span> 노트북 연결
                           </button>
                         )}
 
-                        <span className={`text-[11px] tabular-nums px-2.5 py-1 rounded-full font-medium ${
-                          open && !canOpen ? 'bg-[#1a1918] text-white' : 'bg-[#f0ede8] text-[#97938c]'
+                        <span className={`text-[11px] tabular-nums px-2 py-0.5 rounded font-medium ${
+                          open && !canOpen ? 'border border-[#3a3835] text-[#3a3835]' : 'bg-[#f0ede8] text-[#97938c]'
                         }`}>
                           {lesson.hours}h
                         </span>
@@ -528,7 +528,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                       <div className="px-8 pb-7 pt-1 bg-[#f7f6f3] border-t border-[#eceae5]">
                         <div className="ml-11">
                           {lesson.summary && (
-                            <p className="text-[14px] text-[#1a1918] leading-[1.9] mb-5">{lesson.summary}</p>
+                            <p className="text-[14px] text-[#3a3835] leading-[1.9] mb-5">{lesson.summary}</p>
                           )}
                           {lesson.objectives && lesson.objectives.length > 0 && (
                             <div>
@@ -536,7 +536,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                               <ul className="space-y-2">
                                 {lesson.objectives.map((obj, oi) => (
                                   <li key={oi} className="flex items-start gap-2.5 text-[14px] text-[#1a1918]">
-                                    <span className="text-[#d8d5cf] mt-1 flex-shrink-0">—</span>
+                                    <span className="text-[#c3bfb8] mt-1 flex-shrink-0">—</span>
                                     <span>{obj}</span>
                                   </li>
                                 ))}
@@ -548,7 +548,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                               onClick={() => handleUploadClick(lesson)}
                               className="mt-6 flex items-center gap-2 text-[12px] text-[#97938c] hover:text-[#1a1918] transition-colors group"
                             >
-                              <span className="w-7 h-7 flex items-center justify-center border border-dashed border-[#d8d5cf] group-hover:border-[#97938c] rounded-lg transition-colors text-[14px]">↑</span>
+                              <span className="w-7 h-7 flex items-center justify-center border border-dashed border-[#c3bfb8] group-hover:border-[#97938c] rounded transition-colors text-[14px]">↑</span>
                               <span>.ipynb 노트북 파일 연결하기</span>
                             </button>
                           )}

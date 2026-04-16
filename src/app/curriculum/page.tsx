@@ -25,9 +25,14 @@ export default function CurriculumPage() {
   return (
     <div className="max-w-5xl mx-auto px-8">
 
-      <section className="py-12">
-        <h1 className="text-[30px] font-bold text-[#1a1918] tracking-tight mb-2">커리큘럼</h1>
-        <p className="text-[14px] text-[#3a3835] font-medium">{subjects.length}개 교과목 · {totalSessions}개 세션 · 총 {totalHours}h</p>
+      <section className="py-16">
+        <div className="border-t border-[#e4e1da] pt-10">
+          <p className="text-[10px] tracking-[0.28em] text-[#97938c] uppercase mb-6 font-medium">전체 과정</p>
+          <div className="flex items-end justify-between">
+            <h1 className="text-[36px] font-bold text-[#1a1918] tracking-tight">커리큘럼</h1>
+            <p className="text-[12px] text-[#97938c] tabular-nums font-medium mb-1">{subjects.length}개 교과목 · {totalSessions}개 세션 · {totalHours}h</p>
+          </div>
+        </div>
       </section>
 
       <div className="space-y-14 pb-20">
@@ -38,12 +43,12 @@ export default function CurriculumPage() {
 
           return (
             <section key={cat}>
-              <div className="flex items-end justify-between mb-5 pb-4 border-b border-[#e4e1da]">
+              <div className="flex items-end justify-between mb-6 pb-5 border-b border-[#e4e1da]">
                 <div>
-                  <h2 className="text-[20px] font-bold text-[#1a1918] mb-1">{cat}</h2>
-                  <p className="text-[13px] text-[#3a3835]">{categoryMeta[cat].desc}</p>
+                  <p className="text-[10px] font-medium tracking-[0.28em] text-[#97938c] uppercase mb-2">{cat}</p>
+                  <p className="text-[13px] text-[#58554f] leading-relaxed max-w-xl">{categoryMeta[cat].desc}</p>
                 </div>
-                <span className="text-[13px] text-[#3a3835] tabular-nums flex-shrink-0 ml-4 font-semibold">{catHours}h</span>
+                <span className="text-[24px] font-bold text-[#1a1918] tabular-nums flex-shrink-0 ml-4 leading-none mb-0.5">{catHours}<span className="text-[14px] text-[#97938c] ml-0.5 font-medium">h</span></span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -55,12 +60,12 @@ export default function CurriculumPage() {
                     <Link
                       key={subject.id}
                       href={`/curriculum/${subject.id}`}
-                      className="group flex flex-col bg-white border border-[#e4e1da] rounded-xl overflow-hidden hover:border-[#1a1918] hover:shadow-[0_4px_24px_rgba(0,0,0,0.07)] transition-all duration-150"
+                      className="group flex flex-col bg-white border border-[#e4e1da] rounded overflow-hidden hover:border-[#1a1918] hover:shadow-[0_2px_12px_rgba(0,0,0,0.05)] transition-all duration-150"
                     >
                       {/* Card top */}
                       <div className="p-5 flex-1">
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-semibold text-[#3a3835] tracking-[0.14em] uppercase bg-[#f0ede8] px-2 py-0.5 rounded">
+                          <span className="text-[10px] font-medium text-[#97938c] tracking-[0.16em] uppercase">
                             {subject.nodes.length > 1 ? `${subject.nodes.length}개 노드` : '단일 노드'}
                           </span>
                           <span className="text-[13px] font-bold text-[#1a1918] tabular-nums">{subject.totalHours}h</span>
@@ -87,7 +92,7 @@ export default function CurriculumPage() {
 
                         {/* 단일 노드 — 설명 */}
                         {subject.nodes.length === 1 && (
-                          <p className="text-[13px] text-[#1a1918] leading-[1.75] mb-4">
+                          <p className="text-[13px] text-[#3a3835] leading-[1.75] mb-4">
                             {subject.nodes[0].description.slice(0, 72)}…
                           </p>
                         )}
@@ -95,7 +100,7 @@ export default function CurriculumPage() {
                         {/* Topics */}
                         <div className="flex flex-wrap gap-1.5">
                           {allTopics.map((t) => (
-                            <span key={t} className="text-[11px] text-[#1a1918] bg-[#f0ede8] border border-[#e4e1da] px-2 py-0.5 rounded-md font-medium">
+                            <span key={t} className="text-[11px] text-[#58554f] bg-[#f0ede8] px-2 py-0.5 rounded font-medium">
                               {t}
                             </span>
                           ))}

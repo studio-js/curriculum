@@ -108,7 +108,7 @@ interface Props {
 /* ── 단계 배지 ── */
 function StepBadge({ n, done }: { n: number; done?: boolean }) {
   return (
-    <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-[11px] font-bold mt-0.5 ${
+    <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded text-[11px] font-bold mt-0.5 ${
       done ? 'bg-[#1a1918] text-white' : 'bg-[#f0ede8] text-[#97938c]'
     }`}>{done ? '✓' : n}</span>
   );
@@ -139,7 +139,7 @@ export default function ColabConnect({ status, errorMsg, onConnect, onClose }: P
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl w-[580px] max-h-[90vh] flex flex-col shadow-2xl border border-[#e4e1da] overflow-hidden"
+        className="bg-white rounded w-[580px] max-h-[90vh] flex flex-col shadow-2xl border border-[#e4e1da] overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* ── 헤더 ── */}
@@ -152,7 +152,7 @@ export default function ColabConnect({ status, errorMsg, onConnect, onClose }: P
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-[#97938c] hover:text-[#1a1918] hover:bg-[#f0ede8] transition-colors text-[20px] leading-none"
+            className="w-7 h-7 flex items-center justify-center rounded text-[#97938c] hover:text-[#1a1918] hover:bg-[#f0ede8] transition-colors text-[20px] leading-none"
           >×</button>
         </div>
 
@@ -172,7 +172,7 @@ export default function ColabConnect({ status, errorMsg, onConnect, onClose }: P
                 href="https://colab.research.google.com/#create=true"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#f9f8f6] border border-[#e4e1da] text-[12px] font-medium text-[#1a1918] hover:bg-[#f0ede8] transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded bg-[#f9f8f6] border border-[#e4e1da] text-[12px] font-medium text-[#1a1918] hover:bg-[#f0ede8] transition-colors"
               >
                 <span>↗</span> Colab 열기
               </a>
@@ -193,15 +193,15 @@ export default function ColabConnect({ status, errorMsg, onConnect, onClose }: P
               </p>
 
               {/* 코드 블록 */}
-              <div className="rounded-xl border border-[#e4e1da] overflow-hidden">
+              <div className="rounded border border-[#e4e1da] overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2 bg-[#f5f3ef] border-b border-[#e4e1da]">
                   <span className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.12em]">셋업 코드</span>
                   <button
                     onClick={handleCopy}
-                    className={`text-[11px] font-medium px-3 py-1 rounded-lg transition-colors ${
+                    className={`text-[11px] font-medium px-3 py-1 rounded transition-colors ${
                       copied
                         ? 'bg-[#1a1918] text-white'
-                        : 'bg-white border border-[#e4e1da] text-[#97938c] hover:text-[#1a1918] hover:border-[#d8d5cf]'
+                        : 'bg-white border border-[#e4e1da] text-[#97938c] hover:text-[#1a1918] hover:border-[#c3bfb8]'
                     }`}
                   >
                     {copied ? '✓ 복사됨' : '복사'}
@@ -212,7 +212,7 @@ export default function ColabConnect({ status, errorMsg, onConnect, onClose }: P
                 </pre>
               </div>
 
-              <p className="text-[11px] text-[#c3bfb8] mt-2">
+              <p className="text-[11px] text-[#97938c] mt-2">
                 ※ 패키지 설치로 첫 실행은 30~60초 소요됩니다.
               </p>
             </div>
@@ -228,7 +228,7 @@ export default function ColabConnect({ status, errorMsg, onConnect, onClose }: P
               </p>
 
               {/* URL 출력 예시 */}
-              <div className="rounded-lg bg-[#1a1918] px-4 py-3 mb-3 font-mono text-[12px] leading-relaxed">
+              <div className="rounded bg-[#1a1918] px-4 py-3 mb-3 font-mono text-[12px] leading-relaxed">
                 <span className="text-[#6a6561]">{'═'.repeat(23)}</span>
                 <br/>
                 <span className="text-[#4caf76]">✅  연결 완료!</span>
@@ -247,15 +247,15 @@ export default function ColabConnect({ status, errorMsg, onConnect, onClose }: P
                   onChange={e => setUrl(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                   placeholder="https://abc-def-123.trycloudflare.com"
-                  className="flex-1 bg-[#f9f8f6] border border-[#e4e1da] rounded-xl px-4 py-2.5 text-[13px] text-[#1a1918] placeholder-[#c3bfb8] focus:outline-none focus:border-[#1a1918] transition-colors font-mono"
+                  className="flex-1 bg-[#f9f8f6] border border-[#e4e1da] rounded px-4 py-2.5 text-[13px] text-[#1a1918] placeholder-[#c3bfb8] focus:outline-none focus:border-[#1a1918] transition-colors font-mono"
                 />
                 <button
                   onClick={handleSubmit}
                   disabled={isConnecting || !url.trim()}
-                  className={`px-5 py-2.5 rounded-xl text-[13px] font-medium transition-colors flex items-center gap-2 ${
+                  className={`px-5 py-2.5 rounded text-[13px] font-medium transition-colors flex items-center gap-2 ${
                     isConnecting
                       ? 'bg-[#f0ede8] text-[#97938c] cursor-not-allowed'
-                      : 'bg-[#1a1918] text-white hover:bg-[#3a3835] disabled:opacity-40 disabled:cursor-not-allowed'
+                      : 'border border-[#1a1918] text-[#1a1918] hover:bg-[#f0ede8] disabled:opacity-40 disabled:cursor-not-allowed'
                   }`}
                 >
                   {isConnecting ? (
@@ -269,7 +269,7 @@ export default function ColabConnect({ status, errorMsg, onConnect, onClose }: P
 
               {/* 오류 메시지 */}
               {status === 'error' && errorMsg && (
-                <div className="mt-3 px-4 py-2.5 rounded-lg bg-[#fdf5f3] border border-[#e8b4a8]">
+                <div className="mt-3 px-4 py-2.5 rounded bg-[#fdf5f3] border border-[#e8b4a8]">
                   <p className="text-[12px] text-[#b04030]">{errorMsg}</p>
                 </div>
               )}
@@ -299,7 +299,7 @@ export default function ColabConnect({ status, errorMsg, onConnect, onClose }: P
           {isConnected && (
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-[#1a1918] text-white text-[12px] font-medium hover:bg-[#3a3835] transition-colors"
+              className="px-5 py-2 rounded border border-[#1a1918] text-[#1a1918] text-[12px] font-medium hover:bg-[#f0ede8] transition-colors"
             >
               학습 시작 →
             </button>

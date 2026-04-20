@@ -15,14 +15,14 @@ import {
   listNotebooks,
 } from '@/lib/supabase';
 
-/* ── 노드별 고정 색상 팔레트 — 웜 계열 ── */
+/* ── 노드별 고정 색상 팔레트 — 웜 계열 (저채도) ── */
 const NODE_PALETTE = [
-  { accent: '#7a5828', light: '#f5eed8', mid: '#d4ba88' }, // 앰버
-  { accent: '#3d6848', light: '#e0eed8', mid: '#8dbfaa' }, // 포레스트
-  { accent: '#7a3828', light: '#f5e4dc', mid: '#d4948a' }, // 테라코타
-  { accent: '#4d6030', light: '#e8eedd', mid: '#a8c08a' }, // 올리브
-  { accent: '#683848', light: '#f0e0e8', mid: '#c49aaa' }, // 더스티 로즈
-  { accent: '#6a4830', light: '#f2e8e0', mid: '#c4a888' }, // 시에나
+  { accent: '#7a5828', light: '#f5f0e8', mid: '#c8b898' }, // 앰버
+  { accent: '#3d6848', light: '#eaf0ea', mid: '#a0c4a8' }, // 포레스트
+  { accent: '#7a3828', light: '#f5ecea', mid: '#d4a898' }, // 테라코타
+  { accent: '#4d6030', light: '#eff0ea', mid: '#b0c090' }, // 올리브
+  { accent: '#683848', light: '#f2eaee', mid: '#c4a0b0' }, // 더스티 로즈
+  { accent: '#6a4830', light: '#f2ede8', mid: '#c4b098' }, // 시에나
 ] as const;
 
 type ViewerState = { lesson: Lesson; sections: NotebookSection[] } | null;
@@ -387,34 +387,43 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                     <li key={n.id}>
                       <button
                         onClick={() => { setActiveNode(i); setActiveLesson(null); }}
-                        className={`w-full text-left px-3 py-2.5 rounded transition-colors ${
-                          isActive ? '' : 'hover:bg-[#f7f6f3]'
-                        }`}
-                        style={isActive ? { backgroundColor: pal.light } : {}}
+                        className="w-full text-left px-3 py-2.5 rounded transition-colors"
+                        style={isActive
+                          ? { backgroundColor: pal.light }
+                          : { backgroundColor: 'transparent' }
+                        }
+                        onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f7f6f3'; }}
+                        onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
                       >
-                        <div className="flex items-center gap-2.5">
-                          {/* 컬러 인디케이터 */}
+                        {/* 상단 행: 번호 + 제목 */}
+                        <div className="flex items-center gap-2 mb-1">
                           <span
                             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: isActive ? pal.accent : '#d4d0c8' }}
                           />
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className="text-[12px] font-medium leading-snug truncate"
-                              style={{ color: isActive ? pal.accent : '#3a3835' }}
-                            >
-                              {n.title}
-                            </p>
-                            <p className="text-[10px] mt-0.5 tabular-nums text-[#97938c]">
-                              {n.lessons.length}세션 · {n.hours}h
-                            </p>
-                          </div>
+                          <p
+                            className="text-[12px] font-medium leading-snug flex-1 truncate"
+                            style={{ color: isActive ? pal.accent : '#3a3835' }}
+                          >
+                            {n.title}
+                          </p>
                           <span
                             className="text-[10px] font-bold tabular-nums flex-shrink-0"
                             style={{ color: isActive ? pal.accent : '#c3bfb8' }}
                           >
                             {String(i + 1).padStart(2, '0')}
                           </span>
+                        </div>
+                        {/* 메타 + 설명 */}
+                        <div className="pl-3.5">
+                          <p className="text-[10px] tabular-nums text-[#97938c] mb-1">
+                            {n.lessons.length}세션 · {n.hours}h
+                          </p>
+                          {n.description && (
+                            <p className="text-[11px] text-[#97938c] leading-[1.6] line-clamp-2">
+                              {n.description}
+                            </p>
+                          )}
                         </div>
                       </button>
                     </li>

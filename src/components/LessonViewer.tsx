@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -8,6 +8,7 @@ import type { NotebookSection, CodeBlock, CodeOutput } from '@/lib/notebookParse
 import { normalizeSections } from '@/lib/notebookParser';
 import { useColabKernel, type ExecResult } from '@/hooks/useColabKernel';
 import ColabConnect from '@/components/ColabConnect';
+import { glossaryMap, glossaryRegex } from '@/lib/glossary';
 
 /* ─────────────────────────────────────────────────────
    코드 하이라이팅 — 웜 라이트 테마
@@ -39,6 +40,60 @@ const warmLight: Record<string, React.CSSProperties> = {
 };
 
 /* ─────────────────────────────────────────────────────
+   용어 툴팁
+───────────────────────────────────────────────────── */
+function GlossaryTooltip({ term, definition }: { term: string; definition: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span
+      className="relative inline"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <span className="border-b border-dotted border-[#a8a49d] cursor-help">{term}</span>
+      {show && (
+        <span
+          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[#1a1918] text-[#f0ede8] text-[11.5px] leading-relaxed px-3 py-2.5 pointer-events-none"
+          style={{ whiteSpace: 'normal', wordBreak: 'keep-all' }}
+        >
+          <span className="block font-semibold text-[#e4e1da] mb-1">{term}</span>
+          {definition}
+          <span
+            className="absolute top-full left-1/2 -translate-x-1/2"
+            style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid #1a1918' }}
+          />
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** 텍스트 노드에서 용어를 찾아 GlossaryTooltip으로 감싸 반환 */
+function applyGlossary(text: string): React.ReactNode {
+  glossaryRegex.lastIndex = 0;
+  const parts = text.split(glossaryRegex);
+  if (parts.length <= 1) return text;
+  return parts.map((part, i) => {
+    const entry = glossaryMap.get(part);
+    if (entry) return <GlossaryTooltip key={i} term={part} definition={entry.definition} />;
+    return part || null;
+  });
+}
+
+/** ReactMarkdown children 중 string 노드에만 용어 처리 적용 */
+function withGlossary(children: React.ReactNode): React.ReactNode {
+  if (typeof children === 'string') return applyGlossary(children);
+  if (Array.isArray(children)) {
+    return children.map((child, i) =>
+      typeof child === 'string'
+        ? <React.Fragment key={i}>{applyGlossary(child)}</React.Fragment>
+        : child
+    );
+  }
+  return children;
+}
+
+/* ─────────────────────────────────────────────────────
    마크다운 컴포넌트
 ───────────────────────────────────────────────────── */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,17 +101,17 @@ const md: Record<string, React.FC<any>> = {
   h1: ({ children }) => <h1 className="text-[20px] font-bold text-[#1a1918] mb-4 leading-snug tracking-tight break-words">{children}</h1>,
   h2: ({ children }) => <h2 className="text-[17px] font-semibold text-[#1a1918] mb-3 mt-1 leading-snug tracking-tight break-words">{children}</h2>,
   h3: ({ children }) => <h3 className="text-[13px] font-semibold text-[#1a1918] mb-2 mt-4 uppercase tracking-[0.07em] break-words">{children}</h3>,
-  p:  ({ children }) => <p className="text-[14px] text-[#3a3835] leading-[1.95] mb-4 break-words">{children}</p>,
+  p:  ({ children }) => <p className="text-[14px] text-[#3a3835] leading-[1.95] mb-4 break-words">{withGlossary(children)}</p>,
   ul: ({ children }) => <ul className="mb-4 space-y-1.5">{children}</ul>,
   ol: ({ children }) => <ol className="mb-4 space-y-1.5">{children}</ol>,
   li: ({ children }) => (
     <li className="flex items-start gap-2 text-[14px] text-[#3a3835] leading-[1.85]">
       <span className="text-[#d8d5cf] mt-[5px] flex-shrink-0 text-[8px]">▸</span>
-      <span className="break-words min-w-0">{children}</span>
+      <span className="break-words min-w-0">{withGlossary(children)}</span>
     </li>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="border-l-2 border-[#e4e1da] pl-4 py-0.5 my-4 text-[13px] text-[#97938c] italic break-words">{children}</blockquote>
+    <blockquote className="border-l-2 border-[#e4e1da] pl-4 py-0.5 my-4 text-[13px] text-[#97938c] italic break-words">{withGlossary(children)}</blockquote>
   ),
   strong: ({ children }) => <strong className="font-semibold text-[#1a1918]">{children}</strong>,
   em:     ({ children }) => <em className="italic text-[#58554f]">{children}</em>,
@@ -77,8 +132,8 @@ const md: Record<string, React.FC<any>> = {
   ),
   table: ({ children }) => <div className="overflow-x-auto mb-5"><table className="w-full text-[13px] border-collapse">{children}</table></div>,
   thead: ({ children }) => <thead className="border-b border-[#e4e1da]">{children}</thead>,
-  th:    ({ children }) => <th className="text-left py-2 pr-6 text-[11px] font-semibold text-[#97938c] uppercase tracking-[0.1em]">{children}</th>,
-  td:    ({ children }) => <td className="py-2 pr-6 text-[13px] text-[#3a3835] border-b border-[#f0ede8] break-words">{children}</td>,
+  th:    ({ children }) => <th className="text-left py-2 pr-6 text-[11px] font-semibold text-[#97938c] uppercase tracking-[0.1em]">{withGlossary(children)}</th>,
+  td:    ({ children }) => <td className="py-2 pr-6 text-[13px] text-[#3a3835] border-b border-[#f0ede8] break-words">{withGlossary(children)}</td>,
   hr:    () => <hr className="border-0 border-t border-[#eceae5] my-6" />,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   img:   ({ src, alt }: any) => {

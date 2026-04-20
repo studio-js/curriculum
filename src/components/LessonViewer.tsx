@@ -8,7 +8,6 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import type { NotebookSection, CodeBlock, CodeOutput } from '@/lib/notebookParser';
 import { normalizeSections } from '@/lib/notebookParser';
 import { useColabKernel, type ExecResult } from '@/hooks/useColabKernel';
-import { usePyodide } from '@/hooks/usePyodide';
 import ColabConnect from '@/components/ColabConnect';
 import type { GlossaryEntry } from '@/lib/glossary';
 import { filterGlossaryForContent, buildNotebookGlossary } from '@/lib/glossary';
@@ -517,8 +516,7 @@ export default function LessonViewer({
   const [showCode,      setShowCode]      = useState(true);
 
   /* ── Colab 커널 ── */
-  const kernel  = useColabKernel();
-  const pyodide = usePyodide();
+  const kernel = useColabKernel();
   const [showColabConnect, setShowColabConnect] = useState(false);
 
   /* ── 학습자 로컬 코드 편집 (셀 키 → 수정된 소스) ── */
@@ -747,20 +745,14 @@ export default function LessonViewer({
     }
   }, []);
 
-  /* ── 다음 코드 셀로 포커스 이동 ── */
+  /* ── 다음 코드 셀로 포커스 이동 (섹션 이동은 하지 않음) ── */
   const moveToNextCell = useCallback((sIdx: number, cIdx: number) => {
-    const secs = localSections;
-    const sec  = secs[sIdx];
-    if (cIdx + 1 < sec.codes.length) {
+    const sec = localSections[sIdx];
+    if (sec && cIdx + 1 < sec.codes.length) {
       setFocusedCell(`${sIdx}-${cIdx + 1}`);
-    } else {
-      const nextSecIdx = secs.findIndex((s, i) => i > sIdx && s.codes.length > 0);
-      if (nextSecIdx >= 0) {
-        scrollTo(nextSecIdx);
-        setFocusedCell(`${nextSecIdx}-0`);
-      }
     }
-  }, [localSections, scrollTo]);
+    // 마지막 셀이면 그냥 유지 — 섹션 이동 없음
+  }, [localSections]);
 
   /* ── Shift+Enter: 실행 + 다음 셀 이동 (전역 단축키, textarea 포커스 없을 때) ── */
   useEffect(() => {
@@ -819,19 +811,15 @@ export default function LessonViewer({
     setTimeout(() => setCopiedCells(prev => ({ ...prev, [cellKey]: false })), 2000);
   }
 
-  /* ── 코드 실행: Colab 연결 시 Colab, 미연결 시 Pyodide ── */
+  /* ── 코드 실행 (Colab 필요) ── */
   async function handleRun(sIdx: number, cIdx: number, code: string) {
+    if (kernel.status !== 'connected') {
+      setShowColabConnect(true);
+      return;
+    }
     const key = `${sIdx}-${cIdx}`;
     setRunStates(prev => ({ ...prev, [key]: 'running' }));
-
-    let result: ExecResult;
-    if (kernel.status === 'connected') {
-      result = await kernel.execute(code);
-    } else {
-      // Pyodide 로드 필요 시 자동 시작
-      result = await pyodide.execute(code);
-    }
-
+    const result = await kernel.execute(code);
     setLiveOutputs(prev => ({ ...prev, [key]: result }));
     setRunStates(prev => ({ ...prev, [key]: result.success ? 'done' : 'error' }));
   }
@@ -953,32 +941,17 @@ export default function LessonViewer({
                   <span className="text-[11px] text-[#97938c]">연결 중</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5">
-                  {/* Pyodide 상태 뱃지 */}
-                  {pyodide.status === 'ready' && (
-                    <div className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-[#f5f0e8] border border-[#d4c4a0]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#7a5828]" />
-                      <span className="text-[10px] text-[#7a5828] font-medium">Python 브라우저</span>
-                    </div>
-                  )}
-                  {pyodide.status === 'loading' && (
-                    <div className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-[#f5f0e8]">
-                      <span className="inline-block w-3 h-3 border-[1.5px] border-[#7a5828] border-t-transparent rounded-full animate-spin" />
-                      <span className="text-[10px] text-[#7a5828]">Python 환경 준비 중</span>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setShowColabConnect(true)}
-                    className={`text-[11px] px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1.5 ${
-                      kernel.status === 'error'
-                        ? 'bg-[#fdf5f3] border border-[#e8b4a8] text-[#b04030] hover:bg-[#faeae6]'
-                        : 'bg-[#f0ede8] text-[#97938c] hover:bg-[#e4e1da] hover:text-[#1a1918]'
-                    }`}
-                  >
-                    <span className="text-[10px]">⚡</span>
-                    {kernel.status === 'error' ? '재연결' : '코랩 연결'}
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowColabConnect(true)}
+                  className={`text-[11px] px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1.5 ${
+                    kernel.status === 'error'
+                      ? 'bg-[#fdf5f3] border border-[#e8b4a8] text-[#b04030] hover:bg-[#faeae6]'
+                      : 'bg-[#f0ede8] text-[#97938c] hover:bg-[#e4e1da] hover:text-[#1a1918]'
+                  }`}
+                >
+                  <span className="text-[10px]">⚡</span>
+                  {kernel.status === 'error' ? '재연결' : '코랩 연결'}
+                </button>
               )}
               <button onClick={() => exportNotebook(localSections, lessonTitle)}
                 className="text-[11px] px-3 py-1.5 rounded bg-[#f0ede8] text-[#97938c] hover:bg-[#e4e1da] hover:text-[#1a1918] transition-colors font-medium"
@@ -1239,11 +1212,9 @@ export default function LessonViewer({
                             className={`flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded transition-colors ${
                               isRunning
                                 ? 'text-[#c3bfb8] cursor-not-allowed'
-                                : pyodide.status === 'loading'
-                                  ? 'text-[#7a5828] hover:bg-[#f5f0e8]'
-                                  : kernel.status === 'connected'
-                                    ? 'text-[#2d7a3a] hover:bg-[#e6f4e9] hover:text-[#1a5228]'
-                                    : 'text-[#7a5828] hover:bg-[#f5f0e8] hover:text-[#5a3818]'
+                                : kernel.status === 'connected'
+                                  ? 'text-[#2d7a3a] hover:bg-[#e6f4e9] hover:text-[#1a5228]'
+                                  : 'text-[#97938c] hover:bg-[#eceae5] hover:text-[#1a1918]'
                             }`}
                             title="Shift+Enter로 실행"
                           >
@@ -1251,11 +1222,6 @@ export default function LessonViewer({
                               <>
                                 <span className="inline-block w-3 h-3 border-[1.5px] border-[#97938c] border-t-transparent rounded-full animate-spin" />
                                 실행 중
-                              </>
-                            ) : pyodide.status === 'loading' ? (
-                              <>
-                                <span className="inline-block w-3 h-3 border-[1.5px] border-[#7a5828] border-t-transparent rounded-full animate-spin" />
-                                준비 중
                               </>
                             ) : (
                               <>▶ 실행{isFocused && <span className="text-[#c3bfb8] font-normal ml-1">⇧↵</span>}</>
@@ -1270,23 +1236,54 @@ export default function LessonViewer({
                           onChange={e => setLocalCodes(prev => ({ ...prev, [cellKey]: e.target.value }))}
                           onFocus={() => setFocusedCell(cellKey)}
                           onKeyDown={e => {
+                            const el  = e.currentTarget;
+                            const val = localCodes[cellKey] ?? block.source;
+                            const sel = el.selectionStart;
+                            const end = el.selectionEnd;
+
+                            /* Shift+Enter: 실행 + 다음 셀 이동 */
+                            if (e.key === 'Enter' && e.shiftKey) {
+                              e.preventDefault();
+                              handleRun(rightIdx, ci, val);
+                              moveToNextCell(rightIdx, ci);
+                              return;
+                            }
+
+                            /* Enter: 자동 들여쓰기 (VSCode 스타일) */
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const lineStart   = val.lastIndexOf('\n', sel - 1) + 1;
+                              const currentLine = val.substring(lineStart, sel);
+                              const indent      = currentLine.match(/^(\s*)/)?.[1] ?? '';
+                              // 콜론으로 끝나는 줄 → 들여쓰기 추가 (Python if/for/def 등)
+                              const extra       = currentLine.trimEnd().endsWith(':') ? '    ' : '';
+                              const newVal      = val.substring(0, sel) + '\n' + indent + extra + val.substring(end);
+                              setLocalCodes(prev => ({ ...prev, [cellKey]: newVal }));
+                              const newPos = sel + 1 + indent.length + extra.length;
+                              requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = newPos; });
+                              return;
+                            }
+
                             /* Tab: 4칸 들여쓰기 */
                             if (e.key === 'Tab') {
                               e.preventDefault();
-                              const el    = e.currentTarget;
-                              const start = el.selectionStart;
-                              const end   = el.selectionEnd;
-                              const val   = localCodes[cellKey] ?? block.source;
-                              const next  = val.substring(0, start) + '    ' + val.substring(end);
-                              setLocalCodes(prev => ({ ...prev, [cellKey]: next }));
-                              requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = start + 4; });
+                              const newVal = val.substring(0, sel) + '    ' + val.substring(end);
+                              setLocalCodes(prev => ({ ...prev, [cellKey]: newVal }));
+                              requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = sel + 4; });
+                              return;
                             }
-                            /* Shift+Enter: 실행 + 다음 셀 */
-                            if (e.key === 'Enter' && e.shiftKey) {
-                              e.preventDefault();
-                              const code = localCodes[cellKey] ?? block.source;
-                              handleRun(rightIdx, ci, code);
-                              moveToNextCell(rightIdx, ci);
+
+                            /* Backspace: 줄 앞 공백이 4의 배수면 한 탭 단위 삭제 */
+                            if (e.key === 'Backspace' && sel === end) {
+                              const lineStart   = val.lastIndexOf('\n', sel - 1) + 1;
+                              const beforeCursor = val.substring(lineStart, sel);
+                              if (beforeCursor.length > 0 && /^\s+$/.test(beforeCursor)) {
+                                e.preventDefault();
+                                const removeCount = beforeCursor.length % 4 === 0 ? 4 : beforeCursor.length % 4;
+                                const newVal = val.substring(0, sel - removeCount) + val.substring(sel);
+                                setLocalCodes(prev => ({ ...prev, [cellKey]: newVal }));
+                                requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = sel - removeCount; });
+                              }
                             }
                           }}
                           className="w-full bg-transparent px-5 py-4 text-[13px] font-mono text-[#2d2a27] leading-[1.8] resize-none focus:outline-none"

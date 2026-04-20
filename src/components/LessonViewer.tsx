@@ -9,7 +9,12 @@ import type { NotebookSection, CodeBlock, CodeOutput } from '@/lib/notebookParse
 import { normalizeSections } from '@/lib/notebookParser';
 import { useColabKernel, type ExecResult } from '@/hooks/useColabKernel';
 import ColabConnect from '@/components/ColabConnect';
-import { glossaryMap, glossaryRegex } from '@/lib/glossary';
+import type { GlossaryEntry } from '@/lib/glossary';
+import { filterGlossaryForContent, buildNotebookGlossary } from '@/lib/glossary';
+
+/* 노트북별 용어집 Context */
+interface GlossaryCtx { map: Map<string, GlossaryEntry>; regex: RegExp }
+const NotebookGlossaryCtx = React.createContext<GlossaryCtx>({ map: new Map(), regex: /(?!)/ });
 
 /* ─────────────────────────────────────────────────────
    코드 하이라이팅 — 웜 라이트 테마
@@ -122,26 +127,21 @@ function GlossaryTooltip({ term, definition }: { term: string; definition: strin
 /* ─────────────────────────────────────────────────────
    용어 해설 패널 (나무위키식 각주)
 ───────────────────────────────────────────────────── */
-function GlossaryFootnotePanel({ sections }: { sections: NotebookSection[] }) {
+function GlossaryFootnotePanel() {
   const [open, setOpen] = useState(false);
+  const { map } = React.useContext(NotebookGlossaryCtx);
 
   const terms = useMemo(() => {
-    const found = new Map<string, string>(); // primary term → definition
-    for (const sec of sections) {
-      glossaryRegex.lastIndex = 0;
-      let m: RegExpExecArray | null;
-      const combined = glossaryRegex;
-      combined.lastIndex = 0;
-      while ((m = combined.exec(sec.markdown)) !== null) {
-        const matched = m[0];
-        const entry = glossaryMap.get(matched);
-        if (entry && !found.has(entry.term)) {
-          found.set(entry.term, entry.definition);
-        }
+    const seen = new Set<string>();
+    const result: { term: string; definition: string }[] = [];
+    for (const entry of map.values()) {
+      if (!seen.has(entry.term)) {
+        seen.add(entry.term);
+        result.push({ term: entry.term, definition: entry.definition });
       }
     }
-    return Array.from(found.entries()).map(([term, definition]) => ({ term, definition }));
-  }, [sections]);
+    return result;
+  }, [map]);
 
   if (terms.length === 0) return null;
 
@@ -185,24 +185,32 @@ function GlossaryFootnotePanel({ sections }: { sections: NotebookSection[] }) {
 }
 
 /** 텍스트 노드에서 용어를 찾아 GlossaryTooltip으로 감싸 반환 */
-function applyGlossary(text: string): React.ReactNode {
-  glossaryRegex.lastIndex = 0;
-  const parts = text.split(glossaryRegex);
+function applyGlossaryWith(
+  text: string,
+  map: Map<string, GlossaryEntry>,
+  regex: RegExp,
+): React.ReactNode {
+  regex.lastIndex = 0;
+  const parts = text.split(regex);
   if (parts.length <= 1) return text;
   return parts.map((part, i) => {
-    const entry = glossaryMap.get(part);
+    const entry = map.get(part);
     if (entry) return <GlossaryTooltip key={i} term={part} definition={entry.definition} />;
     return part || null;
   });
 }
 
 /** ReactMarkdown children 중 string 노드에만 용어 처리 적용 */
-function withGlossary(children: React.ReactNode): React.ReactNode {
-  if (typeof children === 'string') return applyGlossary(children);
+function withGlossaryWith(
+  children: React.ReactNode,
+  map: Map<string, GlossaryEntry>,
+  regex: RegExp,
+): React.ReactNode {
+  if (typeof children === 'string') return applyGlossaryWith(children, map, regex);
   if (Array.isArray(children)) {
     return children.map((child, i) =>
       typeof child === 'string'
-        ? <React.Fragment key={i}>{applyGlossary(child)}</React.Fragment>
+        ? <React.Fragment key={i}>{applyGlossaryWith(child, map, regex)}</React.Fragment>
         : child
     );
   }
@@ -217,18 +225,29 @@ const md: Record<string, React.FC<any>> = {
   h1: ({ children }) => <h1 className="text-[20px] font-bold text-[#1a1918] mb-4 leading-snug tracking-tight break-words">{children}</h1>,
   h2: ({ children }) => <h2 className="text-[17px] font-semibold text-[#1a1918] mb-3 mt-1 leading-snug tracking-tight break-words">{children}</h2>,
   h3: ({ children }) => <h3 className="text-[13px] font-semibold text-[#1a1918] mb-2 mt-4 uppercase tracking-[0.07em] break-words">{children}</h3>,
-  p:  ({ children }) => <p className="text-[14px] text-[#3a3835] leading-[1.95] mb-4 break-words">{withGlossary(children)}</p>,
+  p:  ({ children }) => {
+    const { map, regex } = React.useContext(NotebookGlossaryCtx);
+    return <p className="text-[14px] text-[#3a3835] leading-[1.95] mb-4 break-words">{withGlossaryWith(children, map, regex)}</p>;
+  },
   ul: ({ children }) => <ul className="mb-4 space-y-1.5">{children}</ul>,
   ol: ({ children }) => <ol className="mb-4 space-y-1.5">{children}</ol>,
-  li: ({ children }) => (
-    <li className="flex items-start gap-2 text-[14px] text-[#3a3835] leading-[1.85]">
-      <span className="text-[#d8d5cf] mt-[5px] flex-shrink-0 text-[8px]">▸</span>
-      <span className="break-words min-w-0">{withGlossary(children)}</span>
-    </li>
-  ),
-  blockquote: ({ children }) => (
-    <blockquote className="border-l-2 border-[#e4e1da] pl-4 py-0.5 my-4 text-[13px] text-[#97938c] italic break-words">{withGlossary(children)}</blockquote>
-  ),
+  li: ({ children }) => {
+    const { map, regex } = React.useContext(NotebookGlossaryCtx);
+    return (
+      <li className="flex items-start gap-2 text-[14px] text-[#3a3835] leading-[1.85]">
+        <span className="text-[#d8d5cf] mt-[5px] flex-shrink-0 text-[8px]">▸</span>
+        <span className="break-words min-w-0">{withGlossaryWith(children, map, regex)}</span>
+      </li>
+    );
+  },
+  blockquote: ({ children }) => {
+    const { map, regex } = React.useContext(NotebookGlossaryCtx);
+    return (
+      <blockquote className="border-l-2 border-[#e4e1da] pl-4 py-0.5 my-4 text-[13px] text-[#97938c] italic break-words">
+        {withGlossaryWith(children, map, regex)}
+      </blockquote>
+    );
+  },
   strong: ({ children }) => <strong className="font-semibold text-[#1a1918]">{children}</strong>,
   em:     ({ children }) => <em className="italic text-[#58554f]">{children}</em>,
   /* 인라인 코드: 줄바꿈 허용 / 펜스드 코드블록은 pre가 처리 */
@@ -248,8 +267,14 @@ const md: Record<string, React.FC<any>> = {
   ),
   table: ({ children }) => <div className="overflow-x-auto mb-5"><table className="w-full text-[13px] border-collapse">{children}</table></div>,
   thead: ({ children }) => <thead className="border-b border-[#e4e1da]">{children}</thead>,
-  th:    ({ children }) => <th className="text-left py-2 pr-6 text-[11px] font-semibold text-[#97938c] uppercase tracking-[0.1em]">{withGlossary(children)}</th>,
-  td:    ({ children }) => <td className="py-2 pr-6 text-[13px] text-[#3a3835] border-b border-[#f0ede8] break-words">{withGlossary(children)}</td>,
+  th:    ({ children }) => {
+    const { map, regex } = React.useContext(NotebookGlossaryCtx);
+    return <th className="text-left py-2 pr-6 text-[11px] font-semibold text-[#97938c] uppercase tracking-[0.1em]">{withGlossaryWith(children, map, regex)}</th>;
+  },
+  td:    ({ children }) => {
+    const { map, regex } = React.useContext(NotebookGlossaryCtx);
+    return <td className="py-2 pr-6 text-[13px] text-[#3a3835] border-b border-[#f0ede8] break-words">{withGlossaryWith(children, map, regex)}</td>;
+  },
   hr:    () => <hr className="border-0 border-t border-[#eceae5] my-6" />,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   img:   ({ src, alt }: any) => {
@@ -817,6 +842,13 @@ export default function LessonViewer({
     setFocusedSec(f => Math.min(f, editDraft.length - 2));
   }
 
+  /* ── 노트북별 용어집 ── */
+  const notebookGlossary = useMemo(() => {
+    const allMarkdown = localSections.map(s => s.markdown).join('\n');
+    const entries = filterGlossaryForContent(allMarkdown);
+    return buildNotebookGlossary(entries);
+  }, [localSections]);
+
   /* ── 계산값 ── */
   const viewSecs     = isEditMode ? editDraft : localSections;
   const rightIdx     = isEditMode ? focusedSec : activeIdx;
@@ -985,6 +1017,7 @@ export default function LessonViewer({
 
         {/* ══ 이론 패널 ══ */}
         {!isEditMode ? (
+          <NotebookGlossaryCtx.Provider value={notebookGlossary}>
           <div ref={leftRef} className="flex-1 overflow-y-auto">
             <div className="max-w-[900px] mx-auto px-6 py-10 pb-40">
               {localSections.map((sec, i) => (
@@ -1012,7 +1045,7 @@ export default function LessonViewer({
                     )}
                     {/* 나무위키식 용어 해설 패널 — 마지막 섹션에만 표시 */}
                     {i === localSections.length - 1 && (
-                      <GlossaryFootnotePanel sections={localSections} />
+                      <GlossaryFootnotePanel />
                     )}
                   </div>
                   {i < localSections.length - 1 && <div className="mx-4 my-2 border-b border-[#eceae5]" />}
@@ -1020,6 +1053,7 @@ export default function LessonViewer({
               ))}
             </div>
           </div>
+          </NotebookGlossaryCtx.Provider>
         ) : (
           /* ── 편집 모드 ── */
           <div className="flex-1 overflow-y-auto">

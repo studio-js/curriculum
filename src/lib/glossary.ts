@@ -174,3 +174,38 @@ export const glossaryRegex = new RegExp(
   `(${_sorted.map(({ text }) => _escape(text)).join('|')})`,
   'g'
 );
+
+/* ── 노트북별 용어집 생성 헬퍼 ── */
+
+/**
+ * 마크다운 텍스트를 스캔해 마스터 용어집에서 실제 등장하는 항목만 반환.
+ * 여러 섹션의 텍스트를 합쳐서 넘기면 됩니다.
+ */
+export function filterGlossaryForContent(content: string): GlossaryEntry[] {
+  const found = new Map<string, GlossaryEntry>();
+  const re = new RegExp(glossaryRegex.source, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    const entry = glossaryMap.get(m[0]);
+    if (entry && !found.has(entry.term)) {
+      found.set(entry.term, entry);
+    }
+  }
+  return Array.from(found.values());
+}
+
+/** entries 배열로부터 map 과 regex 를 빌드해 반환. */
+export function buildNotebookGlossary(entries: GlossaryEntry[]): {
+  map: Map<string, GlossaryEntry>;
+  regex: RegExp;
+} {
+  if (!entries.length) return { map: new Map(), regex: /(?!)/ };
+
+  const sorted = entries
+    .flatMap(e => [e.term, ...(e.aliases ?? [])].map(t => ({ text: t, entry: e })))
+    .sort((a, b) => b.text.length - a.text.length);
+
+  const map = new Map<string, GlossaryEntry>(sorted.map(({ text, entry }) => [text, entry]));
+  const regex = new RegExp(`(${sorted.map(({ text }) => _escape(text)).join('|')})`, 'g');
+  return { map, regex };
+}

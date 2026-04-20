@@ -50,13 +50,16 @@ function GlossaryTooltip({ term, definition }: { term: string; definition: strin
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
-      <span className="border-b border-dotted border-[#a8a49d] cursor-help">{term}</span>
+      {/* 약한 amber 하이라이트 + 점선 밑줄 */}
+      <span className="bg-[#f5efd6] rounded-[3px] px-[3px] border-b border-dotted border-[#c0a055] cursor-help leading-normal">
+        {term}
+      </span>
       {show && (
         <span
-          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[#1a1918] text-[#f0ede8] text-[11.5px] leading-relaxed px-3 py-2.5 pointer-events-none"
+          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-[#1a1918] text-[#f0ede8] text-[11.5px] leading-relaxed px-3.5 py-3 pointer-events-none"
           style={{ whiteSpace: 'normal', wordBreak: 'keep-all' }}
         >
-          <span className="block font-semibold text-[#e4e1da] mb-1">{term}</span>
+          <span className="block text-[10px] font-semibold tracking-[0.12em] uppercase text-[#c3bfb8] mb-1.5">{term}</span>
           {definition}
           <span
             className="absolute top-full left-1/2 -translate-x-1/2"
@@ -65,6 +68,71 @@ function GlossaryTooltip({ term, definition }: { term: string; definition: strin
         </span>
       )}
     </span>
+  );
+}
+
+/* ─────────────────────────────────────────────────────
+   용어 해설 패널 (나무위키식 각주)
+───────────────────────────────────────────────────── */
+function GlossaryFootnotePanel({ sections }: { sections: NotebookSection[] }) {
+  const [open, setOpen] = useState(false);
+
+  const terms = useMemo(() => {
+    const found = new Map<string, string>(); // primary term → definition
+    for (const sec of sections) {
+      glossaryRegex.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      const combined = glossaryRegex;
+      combined.lastIndex = 0;
+      while ((m = combined.exec(sec.markdown)) !== null) {
+        const matched = m[0];
+        const entry = glossaryMap.get(matched);
+        if (entry && !found.has(entry.term)) {
+          found.set(entry.term, entry.definition);
+        }
+      }
+    }
+    return Array.from(found.entries()).map(([term, definition]) => ({ term, definition }));
+  }, [sections]);
+
+  if (terms.length === 0) return null;
+
+  return (
+    <div className="mt-10 border-t border-[#e4e1da]">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2.5 w-full pt-4 pb-2 text-left group"
+      >
+        <span className="text-[9px] font-semibold tracking-[0.22em] uppercase text-[#97938c]">용어 해설</span>
+        <span className="text-[9px] text-[#c3bfb8] font-medium tabular-nums">({terms.length})</span>
+        <span className="ml-auto text-[#c3bfb8] group-hover:text-[#97938c] transition-colors">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
+            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-1 pb-4">
+          {terms.map(({ term, definition }, i) => (
+            <div
+              key={term}
+              className={`flex gap-4 py-2.5 text-[12px] ${i < terms.length - 1 ? 'border-b border-[#f0ede8]' : ''}`}
+            >
+              <span className="flex-shrink-0 text-[#97938c] tabular-nums text-[10px] mt-[2px] w-5 text-right">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <span className="flex-shrink-0 font-semibold text-[#1a1918] w-28 leading-relaxed">
+                <span className="bg-[#f5efd6] rounded-[3px] px-[3px] border-b border-dotted border-[#c0a055] text-[11.5px]">
+                  {term}
+                </span>
+              </span>
+              <span className="text-[#58554f] leading-relaxed">{definition}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -144,21 +212,18 @@ const md: Record<string, React.FC<any>> = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   a: ({ href, children, ...props }: any) => {
     if (!href) return <span>{children}</span>;
-    const isExternal = href.startsWith('http://') || href.startsWith('https://');
     return (
       <a
         href={href}
-        target={isExternal ? '_blank' : undefined}
-        rel={isExternal ? 'noopener noreferrer' : undefined}
-        className="inline-flex items-center gap-1 text-[#1a1918] underline decoration-[#d8d5cf] underline-offset-2 hover:decoration-[#1a1918] transition-colors"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 bg-[#eef3f9] rounded-[3px] px-[3px] text-[#1a4a7a] underline decoration-[#1a4a7a]/40 underline-offset-2 hover:decoration-[#1a4a7a] hover:bg-[#e3ecf6] transition-colors"
         {...props}
       >
         {children}
-        {isExternal && (
-          <svg className="w-3 h-3 flex-shrink-0 text-[#97938c]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M6.5 3.5h6m0 0v6m0-6L7 10" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        )}
+        <svg className="w-3 h-3 flex-shrink-0 text-[#1a4a7a]/50" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M6.5 3.5h6m0 0v6m0-6L7 10" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </a>
     );
   },
@@ -175,24 +240,21 @@ const LINK_RE = /<a\s[^>]*href=["']([^"']+)["'][^>]*>.*?<\/a>/gi;
 function renderRawLink(tag: string, key: number) {
   const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
   const href = hrefMatch?.[1] ?? '';
-  const isExternal = href.startsWith('http://') || href.startsWith('https://');
   const textMatch = tag.match(/>([^<]+)<\/a>/i);
   const text = textMatch?.[1] ?? href;
-  
+
   return (
     <a
       key={key}
       href={href}
-      target={isExternal ? '_blank' : undefined}
-      rel={isExternal ? 'noopener noreferrer' : undefined}
-      className="inline-flex items-center gap-1 text-[#1a1918] underline decoration-[#d8d5cf] underline-offset-2 hover:decoration-[#1a1918] transition-colors"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 bg-[#eef3f9] rounded-[3px] px-[3px] text-[#1a4a7a] underline decoration-[#1a4a7a]/40 underline-offset-2 hover:decoration-[#1a4a7a] hover:bg-[#e3ecf6] transition-colors"
     >
       {text}
-      {isExternal && (
-        <svg className="w-3 h-3 flex-shrink-0 text-[#97938c]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M6.5 3.5h6m0 0v6m0-6L7 10" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      )}
+      <svg className="w-3 h-3 flex-shrink-0 text-[#1a4a7a]/50" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M6.5 3.5h6m0 0v6m0-6L7 10" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
     </a>
   );
 }
@@ -899,6 +961,10 @@ export default function LessonViewer({
                           <img key={imgIdx} src={src} alt="마크다운 이미지" className="max-w-full rounded border border-[#e4e1da]" />
                         ))}
                       </div>
+                    )}
+                    {/* 나무위키식 용어 해설 패널 — 마지막 섹션에만 표시 */}
+                    {i === localSections.length - 1 && (
+                      <GlossaryFootnotePanel sections={localSections} />
                     )}
                   </div>
                   {i < localSections.length - 1 && <div className="mx-4 my-2 border-b border-[#eceae5]" />}

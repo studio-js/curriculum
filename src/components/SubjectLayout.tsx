@@ -414,15 +414,27 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                             {String(i + 1).padStart(2, '0')}
                           </span>
                         </div>
-                        {/* 메타 + 설명 */}
+                        {/* 메타 + 토픽 태그 */}
                         <div className="pl-3.5">
-                          <p className="text-[10px] tabular-nums text-[#97938c] mb-1">
+                          <p className="text-[10px] tabular-nums text-[#97938c] mb-1.5">
                             {n.lessons.length}세션 · {n.hours}h
                           </p>
-                          {n.description && (
-                            <p className="text-[11px] text-[#97938c] leading-[1.6] line-clamp-2">
-                              {n.description}
-                            </p>
+                          {n.topics && n.topics.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {n.topics.slice(0, 4).map(t => (
+                                <span
+                                  key={t}
+                                  className="text-[10px] px-1.5 py-0.5 rounded-[3px]"
+                                  style={{
+                                    backgroundColor: isActive ? pal.light : '#f0ede8',
+                                    color: isActive ? pal.accent : '#97938c',
+                                    border: `1px solid ${isActive ? pal.mid : '#e4e1da'}`,
+                                  }}
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </div>
                       </button>

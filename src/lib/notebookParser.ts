@@ -41,7 +41,8 @@ interface RawNotebook {
   metadata?: { language_info?: { name?: string } };
 }
 
-function joinSource(src: string | string[]): string {
+function joinSource(src: string | string[] | null | undefined): string {
+  if (src == null) return '';
   return Array.isArray(src) ? src.join('') : src;
 }
 

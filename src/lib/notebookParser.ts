@@ -10,10 +10,11 @@ export interface CodeBlock {
 }
 
 export interface NotebookSection {
-  id:       string;
-  markdown: string;
-  codes:    CodeBlock[];
-  language: string;
+  id:             string;
+  markdown:       string;
+  codes:          CodeBlock[];
+  language:       string;
+  markdownImages?: string[];
 }
 
 interface RawOutput {
@@ -86,11 +87,19 @@ function parseOutputs(raw: RawOutput[] = []): CodeOutput[] {
   return result;
 }
 
-/** 구버전 localStorage (codes: string[]) 호환 변환 */
-function normalizeCode(c: unknown): CodeBlock {
-  if (typeof c === 'string') return { source: c, outputs: [] };
-  const block = c as Partial<CodeBlock>;
-  return { source: block.source ?? '', outputs: block.outputs ?? [] };
+function extractMarkdownImages(markdown: string): { text: string; images: string[] } {
+  const images: string[] = [];
+  const imageRegex = /!\[([^\]]*)\]\((data:image\/[^)]+)\)/g;
+  let text = markdown;
+  let match;
+
+  while ((match = imageRegex.exec(markdown)) !== null) {
+    images.push(match[2]);
+  }
+  text = text.replace(imageRegex, '');
+  imageRegex.lastIndex = 0;
+
+  return { text, images };
 }
 
 export function parseNotebook(notebook: RawNotebook): NotebookSection[] {
@@ -104,7 +113,8 @@ export function parseNotebook(notebook: RawNotebook): NotebookSection[] {
 
     if (cell.cell_type === 'markdown') {
       if (current) sections.push(current);
-      current = { id: `section-${sections.length}`, markdown: source, codes: [], language };
+      const { text, images } = extractMarkdownImages(source);
+      current = { id: `section-${sections.length}`, markdown: text, codes: [], language, markdownImages: images };
     } else if (cell.cell_type === 'code') {
       if (!current) current = { id: 'section-0', markdown: '', codes: [], language };
       current.codes.push({ source, outputs: parseOutputs(cell.outputs) });
@@ -113,6 +123,13 @@ export function parseNotebook(notebook: RawNotebook): NotebookSection[] {
 
   if (current) sections.push(current);
   return sections;
+}
+
+/** 구버전 localStorage (codes: string[]) 호환 변환 */
+function normalizeCode(c: unknown): CodeBlock {
+  if (typeof c === 'string') return { source: c, outputs: [] };
+  const block = c as Partial<CodeBlock>;
+  return { source: block.source ?? '', outputs: block.outputs ?? [] };
 }
 
 /** localStorage에서 불러온 데이터 정규화 (구버전 호환) */

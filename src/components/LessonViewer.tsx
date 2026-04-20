@@ -86,21 +86,75 @@ const md: Record<string, React.FC<any>> = {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} alt={alt ?? ''} className="max-w-full rounded my-3 border border-[#e4e1da]" />;
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  a: ({ href, children, ...props }: any) => {
+    if (!href) return <span>{children}</span>;
+    const isExternal = href.startsWith('http://') || href.startsWith('https://');
+    return (
+      <a
+        href={href}
+        target={isExternal ? '_blank' : undefined}
+        rel={isExternal ? 'noopener noreferrer' : undefined}
+        className="inline-flex items-center gap-1 text-[#1a1918] underline decoration-[#d8d5cf] underline-offset-2 hover:decoration-[#1a1918] transition-colors"
+        {...props}
+      >
+        {children}
+        {isExternal && (
+          <svg className="w-3 h-3 flex-shrink-0 text-[#97938c]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M6.5 3.5h6m0 0v6m0-6L7 10" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </a>
+    );
+  },
 };
 
 /* ─────────────────────────────────────────────────────
-   마크다운 렌더러 — <img> raw HTML 태그도 처리
+   마크다운 렌더러 — <img> <a> raw HTML 태그도 처리
    rehype-raw가 components 맵을 우회하므로
-   ReactMarkdown 전에 <img>를 추출해 직접 렌더링
+   ReactMarkdown 전에 <img>와 <a>를 추출해 직접 렌더링
 ───────────────────────────────────────────────────── */
 const IMG_RE = /<img\s[^>]*>/gi;
+const LINK_RE = /<a\s[^>]*href=["']([^"']+)["'][^>]*>.*?<\/a>/gi;
+
+function renderRawLink(tag: string, key: number) {
+  const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
+  const href = hrefMatch?.[1] ?? '';
+  const isExternal = href.startsWith('http://') || href.startsWith('https://');
+  const textMatch = tag.match(/>([^<]+)<\/a>/i);
+  const text = textMatch?.[1] ?? href;
+  
+  return (
+    <a
+      key={key}
+      href={href}
+      target={isExternal ? '_blank' : undefined}
+      rel={isExternal ? 'noopener noreferrer' : undefined}
+      className="inline-flex items-center gap-1 text-[#1a1918] underline decoration-[#d8d5cf] underline-offset-2 hover:decoration-[#1a1918] transition-colors"
+    >
+      {text}
+      {isExternal && (
+        <svg className="w-3 h-3 flex-shrink-0 text-[#97938c]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M6.5 3.5h6m0 0v6m0-6L7 10" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+    </a>
+  );
+}
 
 function MdWithImages({ children }: { children: string }) {
-  const parts: { type: 'md' | 'img'; content: string }[] = [];
+  const parts: { type: 'md' | 'img' | 'link'; content: string }[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
-  IMG_RE.lastIndex = 0;
 
+  LINK_RE.lastIndex = 0;
+  while ((m = LINK_RE.exec(children)) !== null) {
+    if (m.index > last) parts.push({ type: 'md', content: children.slice(last, m.index) });
+    parts.push({ type: 'link', content: m[0] });
+    last = m.index + m[0].length;
+  }
+  
+  IMG_RE.lastIndex = last;
   while ((m = IMG_RE.exec(children)) !== null) {
     if (m.index > last) parts.push({ type: 'md', content: children.slice(last, m.index) });
     parts.push({ type: 'img', content: m[0] });
@@ -117,6 +171,9 @@ function MdWithImages({ children }: { children: string }) {
           if (!srcMatch?.[1]) return null;
           // eslint-disable-next-line @next/next/no-img-element
           return <img key={i} src={srcMatch[1]} alt={altMatch?.[1] ?? ''} className="max-w-full rounded my-3 border border-[#e4e1da]" />;
+        }
+        if (p.type === 'link') {
+          return renderRawLink(p.content, i);
         }
         return (
           <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={md}>
@@ -780,6 +837,14 @@ export default function LessonViewer({
                       )}
                     </div>
                     <MdWithImages>{sec.markdown}</MdWithImages>
+                    {sec.markdownImages && sec.markdownImages.length > 0 && (
+                      <div className="mt-4 space-y-3">
+                        {sec.markdownImages.map((src, imgIdx) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={imgIdx} src={src} alt="마크다운 이미지" className="max-w-full rounded border border-[#e4e1da]" />
+                        ))}
+                      </div>
+                    )}
                   </div>
                   {i < localSections.length - 1 && <div className="mx-4 my-2 border-b border-[#eceae5]" />}
                 </div>

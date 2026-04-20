@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -44,28 +45,66 @@ const warmLight: Record<string, React.CSSProperties> = {
 ───────────────────────────────────────────────────── */
 function GlossaryTooltip({ term, definition }: { term: string; definition: string }) {
   const [show, setShow] = useState(false);
+  const [style, setStyle] = useState<{ top: number; left: number; arrowLeft: number }>({ top: 0, left: 0, arrowLeft: 128 });
+  const termRef = useRef<HTMLSpanElement>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    if (termRef.current) {
+      const rect = termRef.current.getBoundingClientRect();
+      const W = 256;   // w-64 = 256px
+      const GAP = 8;   // gap between term and tooltip
+      const MARGIN = 12; // min distance from viewport edge
+
+      const termCx = rect.left + rect.width / 2;
+      let left = termCx - W / 2;
+      // clamp to viewport
+      if (left < MARGIN) left = MARGIN;
+      if (left + W > window.innerWidth - MARGIN) left = window.innerWidth - MARGIN - W;
+
+      setStyle({
+        top:       rect.top - GAP,          // tooltip bottom = term top - gap
+        left,
+        arrowLeft: termCx - left,           // arrow stays over the term
+      });
+    }
+    setShow(true);
+  }, []);
+
   return (
-    <span
-      className="relative inline"
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-    >
+    <span className="relative inline" onMouseEnter={handleMouseEnter} onMouseLeave={() => setShow(false)}>
       {/* 약한 amber 하이라이트 + 점선 밑줄 */}
-      <span className="bg-[#f5efd6] rounded-[3px] px-[3px] border-b border-dotted border-[#c0a055] cursor-help leading-normal">
+      <span ref={termRef} className="bg-[#f5efd6] rounded-[3px] px-[3px] border-b border-dotted border-[#c0a055] cursor-help leading-normal">
         {term}
       </span>
-      {show && (
-        <span
-          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-[#1a1918] text-[#f0ede8] text-[11.5px] leading-relaxed px-3.5 py-3 pointer-events-none"
-          style={{ whiteSpace: 'normal', wordBreak: 'keep-all' }}
+
+      {/* portal → document.body 에 렌더 → overflow 클리핑 완전 우회 */}
+      {show && typeof window !== 'undefined' && createPortal(
+        <div
+          className="fixed z-[9999] w-64 bg-[#1a1918] text-[#f0ede8] text-[11.5px] leading-relaxed px-3.5 py-3 pointer-events-none"
+          style={{
+            top:       style.top,
+            left:      style.left,
+            transform: 'translateY(calc(-100% - 0px))',
+            whiteSpace: 'normal',
+            wordBreak: 'keep-all',
+          }}
         >
           <span className="block text-[10px] font-semibold tracking-[0.12em] uppercase text-[#c3bfb8] mb-1.5">{term}</span>
           {definition}
+          {/* 화살표: 항상 용어 중앙 가리킴 */}
           <span
-            className="absolute top-full left-1/2 -translate-x-1/2"
-            style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid #1a1918' }}
+            className="absolute top-full"
+            style={{
+              left:      style.arrowLeft,
+              transform: 'translateX(-50%)',
+              width: 0, height: 0,
+              borderLeft:  '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderTop:   '5px solid #1a1918',
+            }}
           />
-        </span>
+        </div>,
+        document.body
       )}
     </span>
   );

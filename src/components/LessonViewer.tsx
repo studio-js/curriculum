@@ -80,27 +80,36 @@ function GlossaryTooltip({ term, definition }: { term: string; definition: strin
       {/* portal → document.body 에 렌더 → overflow 클리핑 완전 우회 */}
       {show && typeof window !== 'undefined' && createPortal(
         <div
-          className="fixed z-[9999] w-64 bg-[#1a1918] text-[#f0ede8] text-[11.5px] leading-relaxed px-3.5 py-3 pointer-events-none"
+          className="fixed z-[9999] w-64 text-[11.5px] leading-[1.75] px-3.5 py-3 pointer-events-none"
           style={{
-            top:       style.top,
-            left:      style.left,
-            transform: 'translateY(calc(-100% - 0px))',
-            whiteSpace: 'normal',
-            wordBreak: 'keep-all',
+            top:             style.top,
+            left:            style.left,
+            transform:       'translateY(-100%)',
+            whiteSpace:      'normal',
+            wordBreak:       'keep-all',
+            background:      '#2d2a27',          /* 순흑 대신 웜 차콜 */
+            border:          '1px solid #4a4845', /* 미묘한 테두리로 깊이감 */
+            boxShadow:       '0 4px 16px rgba(0,0,0,0.18)',
+            color:           '#f5f3ef',           /* 밝은 웜 화이트 */
           }}
         >
-          <span className="block text-[10px] font-semibold tracking-[0.12em] uppercase text-[#c3bfb8] mb-1.5">{term}</span>
+          <span
+            className="block text-[9.5px] font-semibold tracking-[0.16em] uppercase mb-1.5"
+            style={{ color: '#c8c4bc' }}          /* 라벨: 중간 밝기 */
+          >
+            {term}
+          </span>
           {definition}
           {/* 화살표: 항상 용어 중앙 가리킴 */}
           <span
             className="absolute top-full"
             style={{
-              left:      style.arrowLeft,
-              transform: 'translateX(-50%)',
+              left:        style.arrowLeft,
+              transform:   'translateX(-50%)',
               width: 0, height: 0,
               borderLeft:  '5px solid transparent',
               borderRight: '5px solid transparent',
-              borderTop:   '5px solid #1a1918',
+              borderTop:   '5px solid #2d2a27',
             }}
           />
         </div>,

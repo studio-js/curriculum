@@ -125,19 +125,29 @@ export const curriculumData: CurriculumData = {
           topics: ['EDA 방법론', '문제 정의', '분석 설계', '인사이트 도출', '리포트 구조화'],
         },
         {
-          id: 'web-scraping',
-          title: '웹 스크레핑 데이터 수집 파이프라인',
-          hours: 14,
+          id: 'static-crawling',
+          title: '정적 크롤링',
+          hours: 5,
           description:
-            'HTML 문서 구조를 이해하고 BeautifulSoup·Selenium으로 정적·동적 웹 데이터를 수집한다. 반복 수집 자동화 스케줄러를 구현하고 원시 데이터를 분석 가능한 구조로 변환하는 파이프라인을 설계한다.',
+            'HTML 문서 구조와 DOM을 이해하고 requests + BeautifulSoup으로 정적 웹 페이지에서 데이터를 수집한다. CSS 선택자와 XPath로 원하는 요소를 정확하게 추출하는 방법을 실습한다.',
           lessons: [
             { title: 'HTML·CSS 구조와 DOM 이해', hours: 2 },
             { title: 'requests + BeautifulSoup 정적 수집', hours: 3 },
+          ],
+          topics: ['HTML·DOM', 'CSS 선택자', 'BeautifulSoup', 'requests'],
+        },
+        {
+          id: 'dynamic-crawling',
+          title: '동적 크롤링',
+          hours: 9,
+          description:
+            'JavaScript로 렌더링되는 동적 페이지를 Selenium으로 제어하고, 반복 수집 자동화 스케줄러와 에러 핸들링을 구현한다. 수집한 원시 데이터를 정제·저장하는 파이프라인을 설계한다.',
+          lessons: [
             { title: 'Selenium 동적 페이지 크롤링', hours: 3 },
             { title: '반복 수집 자동화·에러 핸들링', hours: 3 },
             { title: '수집 데이터 정제·저장 파이프라인 설계', hours: 3 },
           ],
-          topics: ['HTML·DOM', 'BeautifulSoup', 'Selenium', '수집 자동화', '데이터 파이프라인'],
+          topics: ['Selenium', 'WebDriver', '수집 자동화', '데이터 파이프라인'],
         },
       ],
     },

@@ -15,14 +15,14 @@ import {
   listNotebooks,
 } from '@/lib/supabase';
 
-/* ── 노드별 고정 색상 팔레트 ── */
+/* ── 노드별 고정 색상 팔레트 — 웜 계열 ── */
 const NODE_PALETTE = [
-  { accent: '#2d5a8a', light: '#e8eef6', mid: '#b8cfe6', label: 'text-[#2d5a8a]', bg: 'bg-[#e8eef6]', border: 'border-[#b8cfe6]' },
-  { accent: '#3d7a52', light: '#e6f0ea', mid: '#b0d4bc', label: 'text-[#3d7a52]', bg: 'bg-[#e6f0ea]', border: 'border-[#b0d4bc]' },
-  { accent: '#7a5230', light: '#f0e8e0', mid: '#d4b89a', label: 'text-[#7a5230]', bg: 'bg-[#f0e8e0]', border: 'border-[#d4b89a]' },
-  { accent: '#5a4070', light: '#ece6f4', mid: '#c0aad8', label: 'text-[#5a4070]', bg: 'bg-[#ece6f4]', border: 'border-[#c0aad8]' },
-  { accent: '#205060', light: '#e2eef2', mid: '#9ac8d8', label: 'text-[#205060]', bg: 'bg-[#e2eef2]', border: 'border-[#9ac8d8]' },
-  { accent: '#7a3040', light: '#f4e6e8', mid: '#d8a8b0', label: 'text-[#7a3040]', bg: 'bg-[#f4e6e8]', border: 'border-[#d8a8b0]' },
+  { accent: '#7a5828', light: '#f5eed8', mid: '#d4ba88' }, // 앰버
+  { accent: '#3d6848', light: '#e0eed8', mid: '#8dbfaa' }, // 포레스트
+  { accent: '#7a3828', light: '#f5e4dc', mid: '#d4948a' }, // 테라코타
+  { accent: '#4d6030', light: '#e8eedd', mid: '#a8c08a' }, // 올리브
+  { accent: '#683848', light: '#f0e0e8', mid: '#c49aaa' }, // 더스티 로즈
+  { accent: '#6a4830', light: '#f2e8e0', mid: '#c4a888' }, // 시에나
 ] as const;
 
 type ViewerState = { lesson: Lesson; sections: NotebookSection[] } | null;

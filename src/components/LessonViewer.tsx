@@ -385,11 +385,43 @@ const md: Record<string, React.FC<any>> = {
 const IMG_RE = /<img\s[^>]*>/gi;
 const LINK_RE = /<a\s[^>]*href=["']([^"']+)["'][^>]*>.*?<\/a>/gi;
 
+/**
+ * XSS 방어: URL이 안전한 프로토콜인지 확인
+ * javascript:, data:text/html 등 스크립트 실행 가능한 URL 차단
+ */
+function isSafeHref(url: string): boolean {
+  if (!url) return false;
+  // 상대 경로는 허용
+  if (url.startsWith('/') || url.startsWith('#') || url.startsWith('.')) return true;
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'http:' || protocol === 'https:' || protocol === 'mailto:';
+  } catch {
+    return false;
+  }
+}
+
+function isSafeImgSrc(url: string): boolean {
+  if (!url) return false;
+  try {
+    const { protocol } = new URL(url);
+    // data:image/* (matplotlib 출력 등)와 http/https만 허용
+    if (protocol === 'data:') return url.startsWith('data:image/');
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    // URL 파싱 실패 → 상대 경로일 가능성
+    return url.startsWith('/');
+  }
+}
+
 function renderRawLink(tag: string, key: number) {
   const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
   const href = hrefMatch?.[1] ?? '';
   const textMatch = tag.match(/>([^<]+)<\/a>/i);
   const text = textMatch?.[1] ?? href;
+
+  /* XSS: javascript: 등 비안전 프로토콜 차단 */
+  if (!isSafeHref(href)) return null;
 
   return (
     <a
@@ -433,9 +465,11 @@ function MdWithImages({ children }: { children: string }) {
         if (p.type === 'img') {
           const srcMatch = p.content.match(/src=["']([^"']+)["']/i);
           const altMatch = p.content.match(/alt=["']([^"']*)["']/i);
-          if (!srcMatch?.[1]) return null;
+          const src = srcMatch?.[1] ?? '';
+          /* XSS: data:text/html, javascript: 등 차단 */
+          if (!src || !isSafeImgSrc(src)) return null;
           // eslint-disable-next-line @next/next/no-img-element
-          return <img key={i} src={srcMatch[1]} alt={altMatch?.[1] ?? ''} className="max-w-full rounded my-3 border border-[#e4e1da]" />;
+          return <img key={i} src={src} alt={altMatch?.[1] ?? ''} className="max-w-full rounded my-3 border border-[#e4e1da]" />;
         }
         if (p.type === 'link') {
           return renderRawLink(p.content, i);

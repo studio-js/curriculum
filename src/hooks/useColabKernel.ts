@@ -19,6 +19,32 @@ const NGROK_HEADERS = {
   'ngrok-skip-browser-warning': '1',
 };
 
+/**
+ * 허용된 터널 도메인 화이트리스트.
+ * Colab 연결 URL은 사용자 입력이므로 알려진 터널 서비스로 제한합니다.
+ */
+const ALLOWED_TUNNEL_HOSTS = [
+  /\.trycloudflare\.com$/,   // Cloudflare Tunnel
+  /\.ngrok\.io$/,            // ngrok
+  /\.ngrok-free\.app$/,      // ngrok (새 도메인)
+  /\.ngrok\.app$/,
+  /\.loca\.lt$/,             // localtunnel
+  /\.localtunnel\.me$/,
+  /^localhost(:\d+)?$/,      // 로컬 개발
+  /^127\.0\.0\.1(:\d+)?$/,
+];
+
+function isAllowedTunnelUrl(rawUrl: string): boolean {
+  try {
+    const u = new URL(rawUrl);
+    /* HTTPS 또는 localhost만 허용 */
+    if (u.protocol !== 'https:' && u.hostname !== 'localhost' && u.hostname !== '127.0.0.1') return false;
+    return ALLOWED_TUNNEL_HOSTS.some(re => re.test(u.host));
+  } catch {
+    return false;
+  }
+}
+
 export function useColabKernel() {
   const [status,   setStatus]   = useState<KernelStatus>('disconnected');
   const [url,      setUrl]      = useState<string | null>(null);
@@ -28,6 +54,11 @@ export function useColabKernel() {
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return;
+    /* 저장된 URL도 화이트리스트 검증 */
+    if (!isAllowedTunnelUrl(saved)) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
     (async () => {
       try {
         const res = await fetch(`${saved}/ping`, {
@@ -61,6 +92,13 @@ export function useColabKernel() {
     const cleanUrl = inputUrl.trim().replace(/\/$/, '');
     setStatus('connecting');
     setErrorMsg(null);
+
+    /* URL 화이트리스트 검증 */
+    if (!isAllowedTunnelUrl(cleanUrl)) {
+      setStatus('error');
+      setErrorMsg('허용되지 않은 URL입니다. ngrok 또는 Cloudflare 터널 URL을 입력하세요.');
+      return;
+    }
 
     try {
       const res = await fetch(`${cleanUrl}/ping`, {

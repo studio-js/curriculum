@@ -9,11 +9,54 @@ import { parseNotebook, NotebookSection } from '@/lib/notebookParser';
 import LessonViewer from '@/components/LessonViewer';
 import { useAuthContext } from '@/contexts/AuthContext';
 import {
-  uploadNotebook,
+  supabase,
   downloadNotebook,
-  deleteNotebookRemote,
   listNotebooks,
 } from '@/lib/supabase';
+
+const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
+
+/** 관리자 API 경유 업로드 (서버사이드 role 검증) */
+async function uploadNotebookViaApi(
+  subjectTitle: string,
+  lessonTitle: string,
+  sectionsJson: string,
+): Promise<{ error: string | null; path: string | null }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return { error: '로그인이 필요합니다.', path: null };
+
+  const res = await fetch('/api/admin/notebooks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ subjectTitle, lessonTitle, sectionsJson }),
+  });
+  const data = await res.json();
+  return { error: data.error ?? null, path: data.path ?? null };
+}
+
+/** 관리자 API 경유 삭제 (서버사이드 role 검증) */
+async function deleteNotebookViaApi(
+  subjectTitle: string,
+  lessonTitle: string,
+  storagePath?: string,
+): Promise<{ error: string | null }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return { error: '로그인이 필요합니다.' };
+
+  const res = await fetch('/api/admin/notebooks', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ subjectTitle, lessonTitle, storagePath }),
+  });
+  const data = await res.json();
+  return { error: data.error ?? null };
+}
 
 /* ── 노드별 고정 색상 팔레트 — 페이지 톤 맞춤 (저채도·중명도) ── */
 const NODE_PALETTE = [
@@ -169,20 +212,36 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
     if (!file || !uploadTarget.current) return;
     const lesson = uploadTarget.current;
 
+    /* ── 클라이언트 사전 검증 ── */
+    if (file.size > MAX_FILE_BYTES) {
+      alert('파일이 너무 큽니다. 50MB 이하의 파일만 업로드할 수 있습니다.');
+      e.target.value = '';
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith('.ipynb')) {
+      alert('.ipynb 파일만 업로드할 수 있습니다.');
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async ev => {
       try {
-        const nb       = JSON.parse(ev.target?.result as string);
+        const raw = ev.target?.result as string;
+        const nb  = JSON.parse(raw); // JSON 파싱 실패 시 catch
+        if (typeof nb !== 'object' || nb === null || !('cells' in nb || 'nbformat' in nb)) {
+          throw new Error('invalid ipynb');
+        }
         const sections = parseNotebook(nb);
         const json     = JSON.stringify(sections);
 
-        const { error, path } = await uploadNotebook(subject.title, lesson.title, json);
+        /* ── 서버사이드 API 경유 업로드 (role 서버 검증) ── */
+        const { error, path } = await uploadNotebookViaApi(subject.title, lesson.title, json);
         if (error || !path) {
           alert('업로드 실패: ' + (error ?? '알 수 없는 오류'));
           return;
         }
 
-        /* 목록 갱신 — storagePath를 함께 저장해야 삭제/다운로드 시 정확한 경로 사용 가능 */
         setAllNotebooks(prev => {
           const filtered = prev.filter(nb => !(nb.subjectTitle === subject.title && nb.lessonTitle === lesson.title));
           return [...filtered, { subjectTitle: subject.title, lessonTitle: lesson.title, storagePath: path }];
@@ -197,9 +256,10 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
     e.target.value = '';
   }
 
-  /* ── 노트북 삭제 ── */
+  /* ── 노트북 삭제 (서버사이드 API 경유) ── */
   async function deleteNotebook(nb: StoredNotebook) {
-    await deleteNotebookRemote(nb.subjectTitle, nb.lessonTitle, nb.storagePath);
+    const { error } = await deleteNotebookViaApi(nb.subjectTitle, nb.lessonTitle, nb.storagePath);
+    if (error) { alert('삭제 실패: ' + error); return; }
     setAllNotebooks(prev => prev.filter(
       n => !(n.subjectTitle === nb.subjectTitle && n.lessonTitle === nb.lessonTitle),
     ));
@@ -208,7 +268,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
 
   async function deleteAllNotebooks() {
     if (!confirm(`업로드된 노트북 ${allNotebooks.length}개를 모두 삭제할까요?`)) return;
-    await Promise.all(allNotebooks.map(nb => deleteNotebookRemote(nb.subjectTitle, nb.lessonTitle, nb.storagePath)));
+    await Promise.all(allNotebooks.map(nb => deleteNotebookViaApi(nb.subjectTitle, nb.lessonTitle, nb.storagePath)));
     setAllNotebooks([]);
     setViewer(null);
     setShowManager(false);

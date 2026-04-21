@@ -26,12 +26,9 @@ export default function LoginPage() {
     try {
       await login(email.trim(), password);
       router.replace('/curriculum');
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? (err.message.includes('Invalid') ? '이메일 또는 비밀번호가 올바르지 않습니다.' : err.message)
-          : '로그인에 실패했습니다.',
-      );
+    } catch {
+      /* 에러 내용을 그대로 노출하면 정보 유출이 되므로 항상 일반 메시지 사용 */
+      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
     } finally {
       setBusy(false);
     }
@@ -43,8 +40,8 @@ export default function LoginPage() {
     try {
       await loginWithGoogle();
       /* Google OAuth는 리다이렉트 방식이므로 여기서 멈춤 */
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Google 로그인에 실패했습니다.');
+    } catch {
+      setError('Google 로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.');
       setGoogleBusy(false);
     }
   }

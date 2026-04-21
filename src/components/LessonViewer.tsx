@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -44,6 +44,81 @@ const warmLight: Record<string, React.CSSProperties> = {
   decorator:    { color: '#7a7570' },
   'attr-name':  { color: '#7a4f2d' },
 };
+
+/* ─────────────────────────────────────────────────────
+   편집 가능 코드 에디터 — 신택스 하이라이팅 오버레이
+   - SyntaxHighlighter (뒤) + 투명 textarea (앞) 겹쳐서
+   - CSS grid로 높이 자동 동기화
+───────────────────────────────────────────────────── */
+const EDITOR_FONT_STYLE: React.CSSProperties = {
+  fontFamily: '"SF Mono","Fira Code","Fira Mono",ui-monospace,monospace',
+  fontSize: '13px',
+  lineHeight: '1.8',
+  tabSize: 4,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  overflowWrap: 'break-word',
+};
+
+function CodeEditor({
+  value, language = 'python', bgColor,
+  onChange, onKeyDown, onFocus,
+}: {
+  value: string; language?: string; bgColor: string;
+  onChange: (v: string) => void;
+  onKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement>;
+  onFocus: () => void;
+}) {
+  return (
+    <div style={{ display: 'grid', background: bgColor }}>
+      {/* 신택스 하이라이팅 pre (높이 결정) */}
+      <SyntaxHighlighter
+        language={language.toLowerCase() === 'python' ? 'python' : language.toLowerCase()}
+        style={warmLight}
+        PreTag="div"
+        wrapLongLines
+        customStyle={{
+          ...EDITOR_FONT_STYLE,
+          padding: '16px 20px',
+          margin: 0,
+          background: 'transparent',
+          pointerEvents: 'none',
+          gridArea: '1 / 1',
+          minHeight: '4.8em',
+          overflow: 'visible',
+        }}
+        codeTagProps={{ style: { ...EDITOR_FONT_STYLE, background: 'transparent' } }}
+      >
+        {/* 빈 값이면 공백 하나 — 마지막 줄 높이 보정 */}
+        {value || ' '}
+      </SyntaxHighlighter>
+
+      {/* 투명 텍스트 textarea — 키보드 입력 담당 */}
+      <textarea
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        onFocus={onFocus}
+        style={{
+          ...EDITOR_FONT_STYLE,
+          padding: '16px 20px',
+          gridArea: '1 / 1',
+          color: 'transparent',
+          background: 'transparent',
+          caretColor: '#2d2a27',
+          resize: 'none',
+          border: 'none',
+          outline: 'none',
+          overflow: 'hidden',
+        }}
+        spellCheck={false}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+      />
+    </div>
+  );
+}
 
 /* ─────────────────────────────────────────────────────
    용어 툴팁
@@ -514,6 +589,8 @@ export default function LessonViewer({
   const [focusedSec,    setFocusedSec]    = useState(0);
   const [hasLocalSave,  setHasLocalSave]  = useState(false);
   const [showCode,      setShowCode]      = useState(true);
+  const [showToc,       setShowToc]       = useState(true);
+  const [codeExpanded,  setCodeExpanded]  = useState(false);
 
   /* ── Colab 커널 ── */
   const kernel = useColabKernel();
@@ -536,7 +613,7 @@ export default function LessonViewer({
   const codePanelRef    = useRef<HTMLDivElement>(null);
   const codeCellRefs    = useRef<Record<string, HTMLDivElement | null>>({});
 
-  /* ── 목차 항목: 모든 섹션의 h1·h2·h3 헤딩을 평탄하게 추출 ── */
+  /* ── 목차 항목: h1·h2·h3 헤딩만 추출 (헤딩 없는 섹션은 목차에서 제외) ── */
   const tocEntries = useMemo<{ level: number; text: string; sectionIdx: number }[]>(() => {
     const secs = isEditMode ? editDraft : localSections;
     const entries: { level: number; text: string; sectionIdx: number }[] = [];
@@ -547,16 +624,22 @@ export default function LessonViewer({
         entries.push({ level: m[1].length, text: m[2].trim(), sectionIdx: si });
       }
     });
-    /* 헤딩이 하나도 없으면 섹션 번호로 폴백 */
-    if (entries.length === 0) {
-      secs.forEach((sec, si) => {
-        const text = sec.markdown.trim().split('\n')[0].replace(/^#+\s*/, '') || `섹션 ${si + 1}`;
-        entries.push({ level: 1, text, sectionIdx: si });
-      });
-    }
     return entries;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode, editDraft, localSections]);
+
+  /* ── 헤딩 없는 섹션 스크롤 시: 직전 헤딩 섹션을 하이라이트 ── */
+  const effectiveActiveSectionIdx = useMemo(() => {
+    if (isEditMode) return focusedSec;
+    // activeIdx 섹션에 헤딩 항목이 있으면 그대로 사용
+    if (tocEntries.some(e => e.sectionIdx === activeIdx)) return activeIdx;
+    // 없으면 activeIdx 이하에서 가장 가까운 헤딩 섹션
+    let best = tocEntries[0]?.sectionIdx ?? activeIdx;
+    for (const entry of tocEntries) {
+      if (entry.sectionIdx <= activeIdx) best = entry.sectionIdx;
+    }
+    return best;
+  }, [isEditMode, focusedSec, activeIdx, tocEntries]);
 
   /* ── localStorage 로드 ──────────────────────────────
      저장된 편집 내용이 있으면 사용하되,
@@ -597,6 +680,31 @@ export default function LessonViewer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode, onClose]);
 
+  /* ── 브라우저 뒤로가기 → 돌아가기와 동일하게 처리 ─────────────────
+     마운트 시 history entry 하나를 push해두고,
+     popstate(back 버튼) 이벤트 발생 시 onClose() 호출.
+     정상 닫기(버튼/ESC) 시에는 cleanup에서 history.back()으로
+     push한 entry를 제거 (flag로 재귀 호출 방지).
+  ─────────────────────────────────────────────────────────────────── */
+  const backClosingRef = useRef(false);
+  useLayoutEffect(() => {
+    history.pushState({ lessonViewer: true }, '');
+    const onPop = () => {
+      if (!backClosingRef.current) onClose();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      // 버튼으로 정상 닫힐 때: push한 entry 제거 (popstate 재발화 방지용 flag)
+      if (history.state?.lessonViewer) {
+        backClosingRef.current = true;
+        history.back();
+        setTimeout(() => { backClosingRef.current = false; }, 200);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ── 섹션 변경 시 포커스 초기화 ── */
   useEffect(() => { setFocusedCell(null); }, [activeIdx, focusedSec]);
 
@@ -606,9 +714,19 @@ export default function LessonViewer({
     const h = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      /* → 코드 패널 닫기 / ← 코드 패널 열기 */
-      if (e.key === 'ArrowRight') { e.preventDefault(); setShowCode(false); return; }
-      if (e.key === 'ArrowLeft')  { e.preventDefault(); setShowCode(true);  return; }
+      /* 좌우 화살표: 코드 전체 ← 분할 → 이론 전체 */
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (codeExpanded) { setCodeExpanded(false); }           // 코드전체 → 분할
+        else              { setShowCode(false); }                // 분할 → 이론전체
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (!showCode)    { setShowCode(true); }                 // 이론전체 → 분할
+        else              { setCodeExpanded(true); }             // 분할 → 코드전체
+        return;
+      }
 
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
 
@@ -642,7 +760,7 @@ export default function LessonViewer({
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, focusedCell, localSections, activeIdx]);
+  }, [isEditMode, focusedCell, localSections, activeIdx, showCode, codeExpanded]);
 
   /* ── 포커스된 셀이 바뀌면 코드 패널을 해당 셀로 스크롤 ── */
   useEffect(() => {
@@ -662,11 +780,13 @@ export default function LessonViewer({
     }
   }, [focusedCell]);
 
-  /* ── 스크롤 감지 ─────────────────────────────────
-     트리거: 패널 중앙(50%) — 섹션 제목이 화면 절반을
-     넘어갔을 때 전환해야 "지금 보고 있는 섹션" 느낌
-     (25%는 너무 이르고, 50%가 체감상 자연스러움)
-  ──────────────────────────────────────────────── */
+  /* ── 스크롤 감지 ─────────────────────────────────────────────────
+     알고리즘: "가시 비율(visible ratio)" — 각 섹션에서
+     화면에 보이는 높이 / 섹션 전체 높이 를 계산하고,
+     비율이 가장 높은 섹션을 현재 섹션으로 선택.
+     → 얇은 섹션이 100% 보이면 비율 1.0 → 어떤 큰 섹션보다 우선
+     → 동률이면 패널 중앙과 가장 가까운 섹션이 승리 (안정적 전환)
+  ────────────────────────────────────────────────────────────────── */
   const updateActive = useCallback(() => {
     if (scrollLock.current) return;
     const panel = leftRef.current;
@@ -674,46 +794,56 @@ export default function LessonViewer({
 
     const { scrollTop, scrollHeight, clientHeight } = panel;
     const panelRect = panel.getBoundingClientRect();
+    const panelTop    = panelRect.top;
+    const panelBottom = panelRect.bottom;
 
-    // 맨 위 도달 → 첫 섹션 강제 (section 0이 짧으면 section 1 top도 trigger 안에 들어오는 문제)
-    if (scrollTop <= 10) {
-      setActiveIdx(prev => { if (prev !== 0) setCodeKey(k => k + 1); return 0; });
-      return;
-    }
-
-    // 하단 도달 → 마지막 섹션 강제
+    if (scrollTop <= 10) { setActiveIdx(() => 0); return; }
     if (scrollTop + clientHeight >= scrollHeight - 80) {
       let last = 0;
       sectionRefs.current.forEach((el, i) => { if (el) last = i; });
-      setActiveIdx(prev => { if (prev !== last) setCodeKey(k => k + 1); return last; });
+      setActiveIdx(() => last);
       return;
     }
 
-    // 트리거: 패널 중앙선 — 섹션 top이 중앙을 넘으면 그 섹션이 현재 읽는 섹션
-    const triggerY = panelRect.top + clientHeight * 0.5;
+    const panelCenterY = panelTop + clientHeight * 0.5;
+    let bestIdx      = 0;
+    let bestRatio    = -1;
+    let bestCenterDist = Infinity;
 
-    let best = 0;
     sectionRefs.current.forEach((el, i) => {
       if (!el) return;
-      if (el.getBoundingClientRect().top <= triggerY) best = i;
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom <= panelTop || rect.top >= panelBottom) return; // 화면 밖
+
+      const visiblePx = Math.min(rect.bottom, panelBottom) - Math.max(rect.top, panelTop);
+      const ratio     = visiblePx / Math.max(rect.height, 1);
+      const centerDist = Math.abs((rect.top + rect.bottom) / 2 - panelCenterY);
+
+      // 비율이 1% 이상 앞서면 그 섹션이 승리; 동률이면 중앙에 더 가까운 쪽
+      const wins = ratio > bestRatio + 0.01
+        || (ratio >= bestRatio - 0.01 && centerDist < bestCenterDist);
+      if (wins) { bestRatio = ratio; bestCenterDist = centerDist; bestIdx = i; }
     });
 
-    setActiveIdx(prev => { if (prev !== best) setCodeKey(k => k + 1); return best; });
+    setActiveIdx(() => bestIdx);
   }, []);
 
+  /* 스크롤 이벤트: rAF 스로틀 — 60fps로 자연스럽게, 빠른 스크롤도 놓치지 않음 */
   useEffect(() => {
     if (isEditMode) return;
     const panel = leftRef.current;
     if (!panel) return;
-    panel.addEventListener('scroll', updateActive, { passive: true });
-    return () => panel.removeEventListener('scroll', updateActive);
+    let rafId: number;
+    const onScroll = () => { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(updateActive); };
+    panel.addEventListener('scroll', onScroll, { passive: true });
+    return () => { panel.removeEventListener('scroll', onScroll); cancelAnimationFrame(rafId); };
   }, [isEditMode, updateActive]);
 
-  /* ── TOC 자동 스크롤: 활성 섹션이 바뀌면 첫 번째 매칭 항목이 보이도록 ── */
+  /* ── TOC 자동 스크롤: 활성 섹션이 바뀌면 해당 항목이 보이도록 ── */
   useEffect(() => {
     const toc = tocRef.current;
     if (!toc) return;
-    const activeTocIdx = tocEntries.findIndex((e: { sectionIdx: number }) => e.sectionIdx === activeIdx);
+    const activeTocIdx = tocEntries.findIndex((e: { sectionIdx: number }) => e.sectionIdx === effectiveActiveSectionIdx);
     if (activeTocIdx < 0) return;
     const item = tocItemRefs.current[activeTocIdx];
     if (!item) return;
@@ -724,7 +854,7 @@ export default function LessonViewer({
     if (itemTop < tocTop + 8 || itemTop + itemH > tocTop + tocH - 8) {
       toc.scrollTo({ top: itemTop - tocH / 2 + itemH / 2, behavior: 'smooth' });
     }
-  }, [activeIdx, tocEntries]);
+  }, [effectiveActiveSectionIdx, tocEntries]);
 
   /* ── TOC 클릭: 즉시 하이라이트 + scroll lock ── */
   const scrollTo = useCallback((idx: number) => {
@@ -733,7 +863,7 @@ export default function LessonViewer({
 
     scrollLock.current = true;
     if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-    scrollLockTimer.current = setTimeout(() => { scrollLock.current = false; }, 1000);
+    scrollLockTimer.current = setTimeout(() => { scrollLock.current = false; }, 1800);
 
     const el = sectionRefs.current[idx];
     const panel = leftRef.current;
@@ -994,84 +1124,63 @@ export default function LessonViewer({
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── 목차 사이드바 ── */}
-        <aside ref={tocRef} className="w-52 flex-shrink-0 bg-white border-r border-[#e4e1da] overflow-y-auto hidden lg:block">
-          <div className="px-4 py-6">
-            <p className="text-[10px] tracking-[0.18em] text-[#97938c] uppercase mb-3 font-semibold">목차</p>
-            <ul className="space-y-0.5">
-              {tocEntries.map((entry, i) => {
-                const isActive = isEditMode ? focusedSec === entry.sectionIdx : activeIdx === entry.sectionIdx;
-                const pl = entry.level === 1 ? 'pl-3' : entry.level === 2 ? 'pl-5' : 'pl-7';
-                return (
-                  <li key={i}>
-                    <button
-                      ref={el => { tocItemRefs.current[i] = el; }}
-                      onClick={() => isEditMode ? setFocusedSec(entry.sectionIdx) : scrollTo(entry.sectionIdx)}
-                      className={`w-full text-left py-1.5 rounded transition-colors ${pl} pr-3 ${isActive ? 'bg-[#f0ede8]' : 'hover:bg-[#f7f6f3]'}`}>
-                      <p className={`leading-snug break-words ${
-                        entry.level === 1
-                          ? `text-[12px] font-semibold ${isActive ? 'text-[#1a1918]' : 'text-[#1a1918]'}`
-                          : entry.level === 2
-                            ? `text-[11px] font-medium ${isActive ? 'text-[#3a3835]' : 'text-[#3a3835]'}`
-                            : `text-[10px] font-medium ${isActive ? 'text-[#97938c]' : 'text-[#97938c]'}`
-                      }`}>
-                        {entry.level === 2 && <span className="text-[#c3bfb8] mr-1 select-none">–</span>}
-                        {entry.level === 3 && <span className="text-[#e4e1da] mr-1 select-none">·</span>}
-                        {entry.text}
-                      </p>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-            {isEditMode && (
-              <button onClick={addSection}
-                className="w-full mt-3 py-2 border border-dashed border-[#e4e1da] rounded text-[11px] text-[#97938c] hover:text-[#1a1918] hover:border-[#c3bfb8] transition-colors">
-                + 섹션 추가
-              </button>
+        <aside className={`${showToc ? 'w-52' : 'w-8'} flex-shrink-0 bg-white border-r border-[#e4e1da] overflow-hidden hidden lg:flex lg:flex-col transition-[width] duration-200`}>
+          {/* 목차 헤더 + 토글 버튼 */}
+          <div className={`flex-shrink-0 flex items-center border-b border-[#f0ede8] ${showToc ? 'px-4 py-3 justify-between' : 'py-3 justify-center'}`}>
+            {showToc && (
+              <p className="text-[10px] tracking-[0.18em] text-[#97938c] uppercase font-semibold">목차</p>
             )}
+            <button
+              onClick={() => setShowToc(t => !t)}
+              className="w-6 h-6 flex items-center justify-center rounded text-[#97938c] hover:text-[#1a1918] hover:bg-[#f0ede8] transition-colors text-[13px] font-medium leading-none"
+              title={showToc ? '목차 숨기기' : '목차 보기'}
+            >
+              {showToc ? '‹' : '›'}
+            </button>
           </div>
+          {/* 스크롤 가능한 목차 콘텐츠 */}
+          {showToc && (
+            <div ref={tocRef} className="flex-1 overflow-y-auto">
+              <div className="px-4 py-4">
+                <ul className="space-y-0.5">
+                  {tocEntries.map((entry, i) => {
+                    const isActive = isEditMode ? focusedSec === entry.sectionIdx : effectiveActiveSectionIdx === entry.sectionIdx;
+                    const pl = entry.level === 1 ? 'pl-3' : entry.level === 2 ? 'pl-5' : 'pl-7';
+                    return (
+                      <li key={i}>
+                        <button
+                          ref={el => { tocItemRefs.current[i] = el; }}
+                          onClick={() => isEditMode ? setFocusedSec(entry.sectionIdx) : scrollTo(entry.sectionIdx)}
+                          className={`w-full text-left py-1.5 rounded transition-colors ${pl} pr-3 ${isActive ? 'bg-[#f0ede8]' : 'hover:bg-[#f7f6f3]'}`}>
+                          <p className={`leading-snug break-words ${
+                            entry.level === 1
+                              ? `text-[12px] font-semibold ${isActive ? 'text-[#1a1918]' : 'text-[#1a1918]'}`
+                              : entry.level === 2
+                                ? `text-[11px] font-medium ${isActive ? 'text-[#3a3835]' : 'text-[#3a3835]'}`
+                                : `text-[10px] font-medium ${isActive ? 'text-[#97938c]' : 'text-[#97938c]'}`
+                          }`}>
+                            {entry.level === 2 && <span className="text-[#c3bfb8] mr-1 select-none">–</span>}
+                            {entry.level === 3 && <span className="text-[#e4e1da] mr-1 select-none">·</span>}
+                            {entry.text}
+                          </p>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {isEditMode && (
+                  <button onClick={addSection}
+                    className="w-full mt-3 py-2 border border-dashed border-[#e4e1da] rounded text-[11px] text-[#97938c] hover:text-[#1a1918] hover:border-[#c3bfb8] transition-colors">
+                    + 섹션 추가
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* ══ 이론 패널 ══ */}
-        {!isEditMode ? (
-          <NotebookGlossaryCtx.Provider value={notebookGlossary}>
-          <div ref={leftRef} className="flex-1 overflow-y-auto">
-            <div className="max-w-[900px] mx-auto px-6 py-10 pb-40">
-              {localSections.map((sec, i) => (
-                <div key={sec.id} ref={el => { sectionRefs.current[i] = el; }} className="mb-4 relative">
-                  <div className={`absolute -left-4 top-0 bottom-0 w-[2px] rounded-full transition-all duration-300 ${activeIdx === i ? 'bg-[#1a1918] opacity-100' : 'opacity-0'}`} />
-                  <div className={`rounded px-10 py-9 overflow-hidden transition-colors duration-200 ${activeIdx === i ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)]' : 'hover:bg-white/60'}`}>
-                    <div className="flex items-center gap-2 mb-5">
-                      <span className={`text-[10px] font-semibold tracking-[0.14em] uppercase tabular-nums ${activeIdx === i ? 'text-[#1a1918]' : 'text-[#97938c]'}`}>
-                        {String(i + 1).padStart(2, '0')}
-                      </span>
-                      {sec.codes.length > 0 && (
-                        <span className="text-[10px] text-[#97938c] bg-[#f0ede8] px-2 py-0.5 rounded font-medium">
-                          코드 {sec.codes.length}개
-                        </span>
-                      )}
-                    </div>
-                    <MdWithImages>{sec.markdown}</MdWithImages>
-                    {sec.markdownImages && sec.markdownImages.length > 0 && (
-                      <div className="mt-4 space-y-3">
-                        {sec.markdownImages.map((src, imgIdx) => (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img key={imgIdx} src={src} alt="마크다운 이미지" className="max-w-full rounded border border-[#e4e1da]" />
-                        ))}
-                      </div>
-                    )}
-                    {/* 나무위키식 용어 해설 패널 — 마지막 섹션에만 표시 */}
-                    {i === localSections.length - 1 && (
-                      <GlossaryFootnotePanel />
-                    )}
-                  </div>
-                  {i < localSections.length - 1 && <div className="mx-4 my-2 border-b border-[#eceae5]" />}
-                </div>
-              ))}
-            </div>
-          </div>
-          </NotebookGlossaryCtx.Provider>
-        ) : (
+        {isEditMode ? (
           /* ── 편집 모드 ── */
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-[680px] mx-auto px-10 py-10 pb-40 space-y-3">
@@ -1110,19 +1219,61 @@ export default function LessonViewer({
               </button>
             </div>
           </div>
+        ) : (
+          /* 뷰 모드: codeExpanded 시 hidden(display:none)으로 숨김 — unmount 안 해서 스크롤 위치 보존 */
+          <NotebookGlossaryCtx.Provider value={notebookGlossary}>
+          <div ref={leftRef} className={`flex-1 overflow-y-auto${codeExpanded ? ' hidden' : ''}`}>
+            <div className="max-w-[900px] mx-auto px-6 py-10 pb-40">
+              {localSections.map((sec, i) => (
+                <div key={sec.id} ref={el => { sectionRefs.current[i] = el; }} className="mb-4 relative">
+                  <div className={`absolute -left-4 top-0 bottom-0 w-[2px] rounded-full transition-all duration-300 ${activeIdx === i ? 'bg-[#1a1918] opacity-100' : 'opacity-0'}`} />
+                  <div className={`rounded px-10 py-9 overflow-hidden transition-colors duration-200 ${activeIdx === i ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)]' : 'hover:bg-white/60'}`}>
+                    <div className="flex items-center gap-2 mb-5">
+                      <span className={`text-[10px] font-semibold tracking-[0.14em] uppercase tabular-nums ${activeIdx === i ? 'text-[#1a1918]' : 'text-[#97938c]'}`}>
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      {sec.codes.length > 0 && (
+                        <span className="text-[10px] text-[#97938c] bg-[#f0ede8] px-2 py-0.5 rounded font-medium">
+                          코드 {sec.codes.length}개
+                        </span>
+                      )}
+                    </div>
+                    <MdWithImages>{sec.markdown}</MdWithImages>
+                    {sec.markdownImages && sec.markdownImages.length > 0 && (
+                      <div className="mt-4 space-y-3">
+                        {sec.markdownImages.map((src, imgIdx) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={imgIdx} src={src} alt="마크다운 이미지" className="max-w-full rounded border border-[#e4e1da]" />
+                        ))}
+                      </div>
+                    )}
+                    {/* 나무위키식 용어 해설 패널 — 마지막 섹션에만 표시 */}
+                    {i === localSections.length - 1 && (
+                      <GlossaryFootnotePanel />
+                    )}
+                  </div>
+                  {i < localSections.length - 1 && <div className="mx-4 my-2 border-b border-[#eceae5]" />}
+                </div>
+              ))}
+            </div>
+          </div>
+          </NotebookGlossaryCtx.Provider>
         )}
 
         {/* ══ 코드 패널 ══════════════════════════════ */}
         {showCode ? (
-        <div className="w-[40%] flex-shrink-0 bg-white flex flex-col overflow-hidden border-l border-[#e4e1da]">
+        <div className={`${codeExpanded ? 'flex-1' : 'w-[40%] flex-shrink-0'} bg-white flex flex-col overflow-hidden border-l border-[#e4e1da] transition-[width] duration-200`}>
 
           {/* 코드 패널 헤더 */}
           <div className="flex-shrink-0 px-5 py-3.5 border-b border-[#eceae5] flex items-center justify-between bg-[#f9f8f6]">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowCode(false)}
+                onClick={() => {
+                  if (codeExpanded) setCodeExpanded(false);
+                  else setShowCode(false);
+                }}
                 className="text-[10px] font-medium text-[#97938c] hover:text-[#1a1918] px-2 py-1 rounded hover:bg-[#eceae5] transition-colors flex items-center gap-1"
-                title="코드 패널 숨기기"
+                title={codeExpanded ? '코드 패널 축소' : '코드 패널 숨기기'}
               >
                 닫기 ›
               </button>
@@ -1133,12 +1284,22 @@ export default function LessonViewer({
               <span className="text-[#e4e1da]">·</span>
               <span className="text-[11px] text-[#97938c] tabular-nums">섹션 {String(rightIdx + 1).padStart(2, '0')}</span>
             </div>
-            {!hasCodes && !isEditMode && (
-              <span className="text-[10px] text-[#97938c] bg-[#f0ede8] px-2 py-0.5 rounded">이론 섹션</span>
-            )}
-            {hasCodes && (
-              <span className="text-[10px] text-[#97938c] font-medium">{rightSec?.codes.length}개 블록</span>
-            )}
+            <div className="flex items-center gap-2">
+              {!hasCodes && !isEditMode && (
+                <span className="text-[10px] text-[#97938c] bg-[#f0ede8] px-2 py-0.5 rounded">이론 섹션</span>
+              )}
+              {hasCodes && (
+                <span className="text-[10px] text-[#97938c] font-medium">{rightSec?.codes.length}개 블록</span>
+              )}
+              {/* 코드 패널 전체화면 토글 */}
+              <button
+                onClick={() => setCodeExpanded(e => !e)}
+                className="text-[11px] font-medium text-[#97938c] hover:text-[#1a1918] w-6 h-6 flex items-center justify-center rounded hover:bg-[#eceae5] transition-colors"
+                title={codeExpanded ? '코드 패널 축소' : '코드 패널 전체화면'}
+              >
+                {codeExpanded ? '⊡' : '⊞'}
+              </button>
+            </div>
           </div>
 
           {/* ── 뷰 모드: 코드 + 출력 ── */}
@@ -1229,71 +1390,64 @@ export default function LessonViewer({
                           </button>
                         </div>
                       </div>
-                      {/* 편집 가능한 코드 영역 */}
-                      <div className={`transition-colors ${isFocused ? 'bg-[#ece9e3]' : 'bg-[#f5f3ef]'}`}>
-                        <textarea
-                          value={localCodes[cellKey] ?? block.source}
-                          onChange={e => setLocalCodes(prev => ({ ...prev, [cellKey]: e.target.value }))}
-                          onFocus={() => setFocusedCell(cellKey)}
-                          onKeyDown={e => {
-                            const el  = e.currentTarget;
-                            const val = localCodes[cellKey] ?? block.source;
-                            const sel = el.selectionStart;
-                            const end = el.selectionEnd;
+                      {/* 편집 가능한 코드 영역 — 신택스 하이라이팅 오버레이 */}
+                      <CodeEditor
+                        value={localCodes[cellKey] ?? block.source}
+                        language={rightSec.language || 'python'}
+                        bgColor={isFocused ? '#ece9e3' : '#f5f3ef'}
+                        onChange={v => setLocalCodes(prev => ({ ...prev, [cellKey]: v }))}
+                        onFocus={() => setFocusedCell(cellKey)}
+                        onKeyDown={e => {
+                          const el  = e.currentTarget;
+                          const val = localCodes[cellKey] ?? block.source;
+                          const sel = el.selectionStart;
+                          const end = el.selectionEnd;
 
-                            /* Shift+Enter: 실행 + 다음 셀 이동 */
-                            if (e.key === 'Enter' && e.shiftKey) {
-                              e.preventDefault();
-                              handleRun(rightIdx, ci, val);
-                              moveToNextCell(rightIdx, ci);
-                              return;
-                            }
+                          /* Shift+Enter: 실행 + 다음 셀 이동 */
+                          if (e.key === 'Enter' && e.shiftKey) {
+                            e.preventDefault();
+                            handleRun(rightIdx, ci, val);
+                            moveToNextCell(rightIdx, ci);
+                            return;
+                          }
 
-                            /* Enter: 자동 들여쓰기 (VSCode 스타일) */
-                            if (e.key === 'Enter') {
+                          /* Enter: 자동 들여쓰기 (VSCode 스타일) */
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const lineStart   = val.lastIndexOf('\n', sel - 1) + 1;
+                            const currentLine = val.substring(lineStart, sel);
+                            const indent      = currentLine.match(/^(\s*)/)?.[1] ?? '';
+                            const extra       = currentLine.trimEnd().endsWith(':') ? '    ' : '';
+                            const newVal      = val.substring(0, sel) + '\n' + indent + extra + val.substring(end);
+                            setLocalCodes(prev => ({ ...prev, [cellKey]: newVal }));
+                            const newPos = sel + 1 + indent.length + extra.length;
+                            requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = newPos; });
+                            return;
+                          }
+
+                          /* Tab: 4칸 들여쓰기 */
+                          if (e.key === 'Tab') {
+                            e.preventDefault();
+                            const newVal = val.substring(0, sel) + '    ' + val.substring(end);
+                            setLocalCodes(prev => ({ ...prev, [cellKey]: newVal }));
+                            requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = sel + 4; });
+                            return;
+                          }
+
+                          /* Backspace: 줄 앞 공백이 4의 배수면 한 탭 단위 삭제 */
+                          if (e.key === 'Backspace' && sel === end) {
+                            const lineStart    = val.lastIndexOf('\n', sel - 1) + 1;
+                            const beforeCursor = val.substring(lineStart, sel);
+                            if (beforeCursor.length > 0 && /^\s+$/.test(beforeCursor)) {
                               e.preventDefault();
-                              const lineStart   = val.lastIndexOf('\n', sel - 1) + 1;
-                              const currentLine = val.substring(lineStart, sel);
-                              const indent      = currentLine.match(/^(\s*)/)?.[1] ?? '';
-                              // 콜론으로 끝나는 줄 → 들여쓰기 추가 (Python if/for/def 등)
-                              const extra       = currentLine.trimEnd().endsWith(':') ? '    ' : '';
-                              const newVal      = val.substring(0, sel) + '\n' + indent + extra + val.substring(end);
+                              const removeCount = beforeCursor.length % 4 === 0 ? 4 : beforeCursor.length % 4;
+                              const newVal = val.substring(0, sel - removeCount) + val.substring(sel);
                               setLocalCodes(prev => ({ ...prev, [cellKey]: newVal }));
-                              const newPos = sel + 1 + indent.length + extra.length;
-                              requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = newPos; });
-                              return;
+                              requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = sel - removeCount; });
                             }
-
-                            /* Tab: 4칸 들여쓰기 */
-                            if (e.key === 'Tab') {
-                              e.preventDefault();
-                              const newVal = val.substring(0, sel) + '    ' + val.substring(end);
-                              setLocalCodes(prev => ({ ...prev, [cellKey]: newVal }));
-                              requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = sel + 4; });
-                              return;
-                            }
-
-                            /* Backspace: 줄 앞 공백이 4의 배수면 한 탭 단위 삭제 */
-                            if (e.key === 'Backspace' && sel === end) {
-                              const lineStart   = val.lastIndexOf('\n', sel - 1) + 1;
-                              const beforeCursor = val.substring(lineStart, sel);
-                              if (beforeCursor.length > 0 && /^\s+$/.test(beforeCursor)) {
-                                e.preventDefault();
-                                const removeCount = beforeCursor.length % 4 === 0 ? 4 : beforeCursor.length % 4;
-                                const newVal = val.substring(0, sel - removeCount) + val.substring(sel);
-                                setLocalCodes(prev => ({ ...prev, [cellKey]: newVal }));
-                                requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = sel - removeCount; });
-                              }
-                            }
-                          }}
-                          className="w-full bg-transparent px-5 py-4 text-[13px] font-mono text-[#2d2a27] leading-[1.8] resize-none focus:outline-none"
-                          rows={Math.max(3, (localCodes[cellKey] ?? block.source).split('\n').length)}
-                          spellCheck={false}
-                          autoComplete="off"
-                          autoCorrect="off"
-                          autoCapitalize="off"
-                        />
-                      </div>
+                          }
+                        }}
+                      />
                       {/* 실행 결과: 라이브 우선, 없으면 노트북 정적 출력 */}
                       {live
                         ? <LiveOutputBlock result={live} />

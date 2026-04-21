@@ -15,14 +15,14 @@ import {
   listNotebooks,
 } from '@/lib/supabase';
 
-/* ── 노드별 고정 색상 팔레트 — 웜 계열 (저채도) ── */
+/* ── 노드별 고정 색상 팔레트 — 페이지 톤 맞춤 (저채도·중명도) ── */
 const NODE_PALETTE = [
-  { accent: '#7a5828', light: '#f5f0e8', mid: '#c8b898' }, // 앰버
-  { accent: '#3d6848', light: '#eaf0ea', mid: '#a0c4a8' }, // 포레스트
-  { accent: '#7a3828', light: '#f5ecea', mid: '#d4a898' }, // 테라코타
-  { accent: '#4d6030', light: '#eff0ea', mid: '#b0c090' }, // 올리브
-  { accent: '#683848', light: '#f2eaee', mid: '#c4a0b0' }, // 더스티 로즈
-  { accent: '#6a4830', light: '#f2ede8', mid: '#c4b098' }, // 시에나
+  { accent: '#8a6e30', light: '#faf6eb', mid: '#d0bf90' }, // 허니 앰버
+  { accent: '#3a7268', light: '#eaf4f1', mid: '#8cc4bc' }, // 더스티 틸
+  { accent: '#9a4848', light: '#f8efed', mid: '#d4a0a0' }, // 더스티 로즈
+  { accent: '#587a40', light: '#eff4e9', mid: '#a0c490' }, // 세이지 올리브
+  { accent: '#785880', light: '#f5f1f7', mid: '#c0a0c8' }, // 소프트 모브
+  { accent: '#8a5840', light: '#f7f0eb', mid: '#cca898' }, // 클레이 테라코타
 ] as const;
 
 type ViewerState = { lesson: Lesson; sections: NotebookSection[] } | null;
@@ -530,25 +530,24 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
             </div>
 
             {/* 세션 목록 */}
-            <div className="bg-white border overflow-hidden" style={{ borderColor: pal.mid }}>
-              {/* 헤더 바 */}
-              <div
-                className="flex items-center justify-between px-8 py-3.5 border-b"
-                style={{ backgroundColor: pal.light, borderColor: pal.mid }}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-[9px] font-semibold tracking-[0.22em] uppercase"
-                    style={{ color: pal.accent }}
-                  >
-                    세션 구성
-                  </span>
-                </div>
-                <span className="text-[11px] tabular-nums font-medium" style={{ color: pal.accent }}>
-                  {node.lessons.length}개
+            <div>
+              {/* 섹션 헤더 */}
+              <div className="flex items-center gap-3 mb-3">
+                <span
+                  className="text-[9px] font-semibold tracking-[0.22em] uppercase"
+                  style={{ color: pal.accent }}
+                >
+                  세션 구성
                 </span>
+                <div className="flex-1 h-px" style={{ backgroundColor: pal.mid + '55' }} />
+                <span className="text-[11px] text-[#97938c] tabular-nums">{node.lessons.length}개</span>
               </div>
 
+              {/* 리스트 컨테이너 */}
+              <div
+                className="rounded-xl overflow-hidden border"
+                style={{ borderColor: '#e4e0d9' }}
+              >
               {node.lessons.map((lesson, i) => {
                 const hasServerNotebook   = !!lesson.notebookPath;
                 const hasUploadedNotebook = hasUploaded(lesson);
@@ -556,85 +555,106 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                 const isLoading = loadingLesson === lesson.title;
                 const open      = activeLesson === i;
                 const hasDetail = !!(lesson.summary || lesson.objectives?.length);
+                const isLast    = i === node.lessons.length - 1;
 
                 return (
-                  <div key={i} className="border-b border-[#f5f4f0] last:border-0">
+                  <div key={i}>
+                    {/* 행 */}
                     <div
-                      className="w-full flex items-center gap-4 px-8 py-4 transition-colors"
-                      style={open && !canOpen ? { backgroundColor: pal.light + '80' } : {}}
-                      onMouseEnter={e => { if (!open || canOpen) (e.currentTarget as HTMLDivElement).style.backgroundColor = pal.light + '60'; }}
-                      onMouseLeave={e => { if (!open || canOpen) (e.currentTarget as HTMLDivElement).style.backgroundColor = ''; }}
+                      className="relative flex items-center gap-4 px-5 py-3.5 transition-colors duration-100 cursor-default"
+                      style={{
+                        backgroundColor: open ? pal.light : 'white',
+                        borderBottom: isLast && !open ? 'none' : `1px solid #f0ece6`,
+                      }}
+                      onMouseEnter={e => {
+                        if (!open) (e.currentTarget as HTMLDivElement).style.backgroundColor = pal.light + '70';
+                      }}
+                      onMouseLeave={e => {
+                        if (!open) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'white';
+                      }}
                     >
+                      {/* 왼쪽 accent 바 (열린 행) */}
+                      {open && (
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-[3px]"
+                          style={{ backgroundColor: pal.accent }}
+                        />
+                      )}
+
                       {/* 번호 */}
                       <span
-                        className="text-[12px] tabular-nums flex-shrink-0 w-6 font-bold"
-                        style={{ color: open ? pal.accent : '#c3bfb8' }}
+                        className="text-[11px] font-bold tabular-nums w-5 text-center flex-shrink-0 select-none"
+                        style={{ color: open ? pal.accent : '#c8c4bc' }}
                       >
                         {String(i + 1).padStart(2, '0')}
                       </span>
 
                       {/* 제목 */}
                       <button
-                        className="flex-1 text-left"
+                        className="flex-1 text-left min-w-0"
                         onClick={() => {
                           if (canOpen) openNotebook(lesson);
                           else if (hasDetail) toggleLesson(i);
                         }}
                       >
-                        <span className={`text-[14px] leading-snug ${open ? 'font-semibold text-[#1a1918]' : 'font-medium text-[#1a1918]'}`}>
+                        <p
+                          className="text-[13.5px] leading-snug truncate"
+                          style={{
+                            color: '#1a1918',
+                            fontWeight: open ? 600 : 450,
+                          }}
+                        >
                           {lesson.title}
-                        </span>
+                        </p>
                       </button>
 
                       {/* 오른쪽 액션 */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-
-                        {canOpen && (
-                          <button
-                            onClick={() => openNotebook(lesson)}
-                            className="text-[10px] font-semibold px-3 py-1.5 rounded flex items-center gap-1 transition-colors"
-                            style={isLoading
-                              ? { backgroundColor: pal.light, color: pal.accent }
-                              : { border: `1px solid ${pal.accent}`, color: pal.accent, backgroundColor: 'white' }
-                            }
-                            onMouseEnter={e => { if (!isLoading) (e.currentTarget as HTMLButtonElement).style.backgroundColor = pal.light; }}
-                            onMouseLeave={e => { if (!isLoading) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white'; }}
-                          >
-                            {isLoading ? (
-                              <>
-                                <span className="inline-block w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
-                                불러오는 중
-                              </>
-                            ) : <>▶ 학습하기</>}
-                          </button>
-                        )}
-
-                        {!canOpen && isAdmin && (
-                          <button
-                            onClick={() => handleUploadClick(lesson)}
-                            className="text-[10px] font-medium px-2.5 py-1 rounded border border-dashed border-[#c3bfb8] text-[#97938c] hover:border-[#97938c] hover:text-[#1a1918] transition-colors flex items-center gap-1"
-                          >
-                            <span>↑</span> 노트북 연결
-                          </button>
-                        )}
-
+                      <div className="flex items-center gap-2.5 flex-shrink-0">
+                        {/* 시간 */}
                         <span
-                          className="text-[11px] tabular-nums px-2 py-0.5 rounded font-medium"
-                          style={open && !canOpen
-                            ? { border: `1px solid ${pal.accent}`, color: pal.accent }
-                            : { backgroundColor: pal.light, color: pal.accent }
-                          }
+                          className="text-[10px] tabular-nums font-medium"
+                          style={{ color: '#a8a49c' }}
                         >
                           {lesson.hours}h
                         </span>
 
+                        {/* 학습 버튼 */}
+                        {canOpen && (
+                          <button
+                            onClick={() => openNotebook(lesson)}
+                            disabled={isLoading}
+                            className="flex items-center gap-1.5 text-[11px] font-semibold px-3.5 py-1.5 rounded-lg transition-opacity"
+                            style={{ backgroundColor: '#2f2c28', color: 'white' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.80'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+                          >
+                            {isLoading ? (
+                              <>
+                                <span className="w-2.5 h-2.5 border border-white/50 border-t-white rounded-full animate-spin" />
+                                로딩
+                              </>
+                            ) : '학습 →'}
+                          </button>
+                        )}
+
+                        {/* 관리자: 노트북 연결 */}
+                        {!canOpen && isAdmin && (
+                          <button
+                            onClick={() => handleUploadClick(lesson)}
+                            className="text-[10px] font-medium px-2.5 py-1.5 rounded-lg border border-dashed border-[#c3bfb8] text-[#97938c] hover:border-[#97938c] hover:text-[#1a1918] transition-colors"
+                          >
+                            ↑ 연결
+                          </button>
+                        )}
+
+                        {/* 아코디언 토글 */}
                         {!canOpen && hasDetail && (
                           <button
                             onClick={() => toggleLesson(i)}
-                            className="text-[11px] w-4 transition-colors"
-                            style={{ color: open ? pal.accent : '#97938c' }}
+                            className="w-5 h-5 flex items-center justify-center rounded text-[9px] transition-colors"
+                            style={{ color: open ? pal.accent : '#b4b0a8' }}
                           >
-                            {open ? '▲' : '▼'}
+                            {open ? '▴' : '▾'}
                           </button>
                         )}
                       </div>
@@ -642,23 +662,30 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
 
                     {/* 아코디언 상세 */}
                     {!canOpen && open && hasDetail && (
-                      <div className="px-8 pb-7 pt-1 border-t" style={{ backgroundColor: pal.light + '60', borderColor: pal.mid }}>
-                        <div className="ml-11">
+                      <div
+                        className="px-5 pb-5 pt-3"
+                        style={{
+                          backgroundColor: pal.light,
+                          borderBottom: isLast ? 'none' : `1px solid ${pal.mid}55`,
+                          borderLeft: `3px solid ${pal.accent}`,
+                        }}
+                      >
+                        <div className="ml-9">
                           {lesson.summary && (
-                            <p className="text-[14px] text-[#3a3835] leading-[1.9] mb-5">{lesson.summary}</p>
+                            <p className="text-[13px] text-[#3a3835] leading-[1.9] mb-4">{lesson.summary}</p>
                           )}
                           {lesson.objectives && lesson.objectives.length > 0 && (
                             <div>
                               <p
-                                className="text-[9px] font-semibold uppercase tracking-[0.22em] mb-3"
+                                className="text-[9px] font-semibold uppercase tracking-[0.22em] mb-2.5"
                                 style={{ color: pal.accent }}
                               >
                                 학습 목표
                               </p>
-                              <ul className="space-y-2">
+                              <ul className="space-y-1.5">
                                 {lesson.objectives.map((obj, oi) => (
-                                  <li key={oi} className="flex items-start gap-2.5 text-[14px] text-[#1a1918]">
-                                    <span className="mt-1 flex-shrink-0 text-[8px]" style={{ color: pal.accent }}>▸</span>
+                                  <li key={oi} className="flex items-start gap-2.5 text-[13px] text-[#1a1918]">
+                                    <span className="mt-[3px] flex-shrink-0 text-[8px]" style={{ color: pal.accent }}>▸</span>
                                     <span>{obj}</span>
                                   </li>
                                 ))}
@@ -668,10 +695,10 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                           {isAdmin && (
                             <button
                               onClick={() => handleUploadClick(lesson)}
-                              className="mt-6 flex items-center gap-2 text-[12px] text-[#97938c] hover:text-[#1a1918] transition-colors group"
+                              className="mt-5 flex items-center gap-2 text-[12px] text-[#97938c] hover:text-[#1a1918] transition-colors group"
                             >
-                              <span className="w-7 h-7 flex items-center justify-center border border-dashed border-[#c3bfb8] group-hover:border-[#97938c] rounded transition-colors text-[14px]">↑</span>
-                              <span>.ipynb 노트북 파일 연결하기</span>
+                              <span className="w-6 h-6 flex items-center justify-center border border-dashed border-[#c3bfb8] group-hover:border-[#97938c] rounded-md transition-colors">↑</span>
+                              <span>.ipynb 노트북 연결하기</span>
                             </button>
                           )}
                         </div>
@@ -680,6 +707,7 @@ export default function SubjectLayout({ subject }: { subject: Subject }) {
                   </div>
                 );
               })}
+              </div>
             </div>
 
             {/* Prev / Next */}

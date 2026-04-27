@@ -32,7 +32,7 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <section className="pt-20 pb-10">
-        <p className="text-[10px] tracking-[0.3em] text-[#97938c] uppercase mb-10 font-medium">
+        <p className="text-[13px] tracking-[0.2em] text-[#97938c] uppercase mb-10 font-medium">
           {course.jobGroup} · {course.jobRole}
         </p>
 

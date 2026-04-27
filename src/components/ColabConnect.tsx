@@ -62,7 +62,7 @@ def execute():
     code = _preprocess(code)  # !명령어 전처리
     old_out, old_err = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = io.StringIO(), io.StringIO()
-    success, images = True, []
+    success, images, err_text = True, [], ''
     try:
         exec(compile(code, '<cell>', 'exec'), _ctx)
         try:
@@ -73,12 +73,13 @@ def execute():
                 images.append(base64.b64encode(buf.getvalue()).decode())
             plt.close('all')
         except: pass
-    except:
+    except Exception:
         success = False
+        err_text = traceback.format_exc()  # except 블록 안에서 즉시 캡처
     out, err = sys.stdout.getvalue(), sys.stderr.getvalue()
     sys.stdout, sys.stderr = old_out, old_err
     return jsonify({'output': out,
-                    'error': traceback.format_exc() if not success else '',
+                    'error': err_text or err,
                     'success': success, 'images': images})
 
 @app.route('/reset', methods=['POST'])

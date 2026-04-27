@@ -1,27 +1,7 @@
 import type { Metadata } from 'next';
-import { Noto_Sans_KR, Jost, EB_Garamond } from 'next/font/google';
 import './globals.css';
 import Header from '@/components/Header';
 import { AuthProvider } from '@/contexts/AuthContext';
-
-const jost = Jost({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-display',
-});
-
-const notoSansKR = Noto_Sans_KR({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '700'],
-  variable: '--font-sans',
-});
-
-const ebGaramond = EB_Garamond({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-  style: ['normal', 'italic'],
-  variable: '--font-serif',
-});
 
 export const metadata: Metadata = {
   title: 'AI 데이터 인텔리전스 전문가 과정',
@@ -30,7 +10,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={`${jost.variable} ${notoSansKR.variable} ${ebGaramond.variable}`}>
+    <html lang="ko">
+      <head>
+        {/* Pretendard — 기하학적 한국어 폰트, Futura 페어링 */}
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+        />
+      </head>
       <body>
         <AuthProvider>
           <Header />

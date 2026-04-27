@@ -1,14 +1,7 @@
 import Link from 'next/link';
 import { curriculumData } from '@/data/curriculum';
 
-type Sector = {
-  num: string;
-  label: string;
-  desc: string;
-  ids: string[];
-};
-
-const sectors: Sector[] = [
+const sectors = [
   {
     num: '01',
     label: '데이터 엔지니어링',
@@ -42,118 +35,88 @@ export default function CurriculumPage() {
 
   const subjectMap = Object.fromEntries(subjects.map((s) => [s.id, s]));
 
-  const totalHours = subjects.reduce((sum, s) => sum + s.totalHours, 0);
+  const totalHours    = subjects.reduce((sum, s) => sum + s.totalHours, 0);
   const totalSessions = subjects.reduce(
-    (sum, s) => sum + s.nodes.reduce((ns, n) => ns + n.lessons.length, 0), 0
+    (sum, s) => sum + s.nodes.reduce((ns, n) => ns + n.lessons.length, 0), 0,
   );
 
   const operationSubjects = operationsIds.map((id) => subjectMap[id]).filter(Boolean);
 
   return (
-    <div className="max-w-5xl mx-auto px-8">
+    <div className="max-w-4xl mx-auto px-8">
 
       {/* ── Header ── */}
-      <section className="pt-14 pb-5">
-        <p className="text-[10px] tracking-[0.28em] text-[#97938c] uppercase mb-6 font-medium">전체 과정</p>
-        <div className="flex items-center justify-between">
-          <h1 className="text-[36px] font-bold text-[#1a1918] tracking-tight">커리큘럼</h1>
-          <p className="text-[12px] text-[#97938c] tabular-nums font-medium">
+      <section className="pt-20 pb-10">
+        <p className="text-[10px] tracking-[0.3em] text-[#97938c] uppercase mb-10 font-medium">전체 과정</p>
+        <div className="flex items-end justify-between gap-6">
+          <h1 className="text-[28px] font-bold text-[#1a1918] tracking-tight leading-none">커리큘럼</h1>
+          <p className="text-[12px] text-[#97938c] tabular-nums font-medium pb-1">
             {subjects.length}개 교과목 · {totalSessions}개 세션 · {totalHours}h
           </p>
         </div>
       </section>
 
       {/* ── Sectors ── */}
-      <div className="pb-20 border-t border-[#e4e1da]">
-        {sectors.map((sector) => {
-          const items = sector.ids.map((id) => subjectMap[id]).filter(Boolean);
+      <div className="pb-24">
+        {[...sectors, { num: '—', label: '과정 운영', desc: '과정 시작·마무리 및 커리어 지원 프로그램', ids: operationsIds }].map((sector) => {
+          const items       = sector.ids.map((id) => subjectMap[id]).filter(Boolean);
           const sectorHours = items.reduce((sum, s) => sum + s.totalHours, 0);
 
           return (
-            <section key={sector.num}>
-              {/* Sector header */}
-              <div className="flex gap-6 pt-10 pb-7">
-                <span className="text-[11px] font-medium text-[#97938c] tabular-nums flex-shrink-0 mt-0.5 tracking-[0.06em]">{sector.num}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[15px] font-semibold text-[#1a1918] mb-2 tracking-tight">{sector.label}</p>
-                  <p className="text-[13px] text-[#58554f] leading-[1.85]">{sector.desc}</p>
-                </div>
-                <span className="text-[22px] font-bold text-[#1a1918] tabular-nums flex-shrink-0 leading-none mt-0.5">
-                  {sectorHours}<span className="text-[13px] text-[#97938c] ml-0.5 font-medium">h</span>
+            <section key={sector.num} className="border-t border-[#e4e1da] pt-10 pb-12">
+
+              {/* Sector header — same language as 메인 track items */}
+              <div className="flex gap-6 items-start mb-6">
+                <span className="text-[11px] font-medium text-[#c3bfb8] tabular-nums flex-shrink-0 mt-0.5 tracking-[0.08em] w-7">
+                  {sector.num}
                 </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[17px] font-semibold text-[#1a1918] mb-2 tracking-tight">{sector.label}</p>
+                  <p className="text-[13px] text-[#58554f] leading-[1.8]">{sector.desc}</p>
+                </div>
+                {sectorHours > 0 && (
+                  <p className="text-[20px] font-bold tabular-nums text-[#1a1918] flex-shrink-0 leading-none mt-0.5">
+                    {sectorHours}<span className="text-[11px] text-[#97938c] ml-0.5 font-medium">h</span>
+                  </p>
+                )}
               </div>
 
-              {/* Subject list */}
-              <div className="border border-[#e4e1da] mb-12">
+              {/* Subject rows — 선 없이 여백으로 구분 */}
+              <div className="ml-[52px]">
                 {items.map((subject, i) => {
-                  const sessions = subject.nodes.reduce((s, n) => s + n.lessons.length, 0);
+                  const sessions  = subject.nodes.reduce((s, n) => s + n.lessons.length, 0);
+                  const isProject = subject.category === '프로젝트';
                   return (
                     <Link
                       key={subject.id}
                       href={`/curriculum/${subject.id}`}
-                      className="group flex items-center gap-4 px-6 py-3.5 border-b border-[#f0ede8] last:border-0 hover:bg-[#faf9f7] transition-colors"
+                      className="group flex items-center gap-4 py-3 -mx-3 px-3 rounded transition-colors hover:bg-[#f7f6f3]"
                     >
                       <span className="text-[11px] text-[#c3bfb8] tabular-nums flex-shrink-0 font-medium w-5">
                         {String(i + 1).padStart(2, '0')}
                       </span>
-                      <span className="text-[13px] font-medium text-[#1a1918] flex-shrink-0 tracking-tight">{subject.title}</span>
-                      {subject.category === '프로젝트' && (
-                        <span className="text-[10px] text-[#97938c] border border-[#e4e1da] px-1.5 py-0.5 flex-shrink-0 tracking-[0.08em] font-medium">
+                      <span className="text-[13.5px] font-medium text-[#1a1918] flex-shrink-0 tracking-tight">
+                        {subject.title}
+                      </span>
+                      {isProject && (
+                        <span className="text-[10px] text-[#97938c] border border-[#e4e1da] px-1.5 py-0.5 flex-shrink-0 tracking-[0.06em] font-medium rounded">
                           프로젝트
                         </span>
                       )}
-                      <span className="flex-1 border-b border-dashed border-[#ece9e3] mb-[2px]" />
-                      <span className="text-[11px] text-[#97938c] tabular-nums flex-shrink-0">{sessions}세션</span>
-                      <span className="text-[12px] font-semibold text-[#3a3835] tabular-nums flex-shrink-0">{subject.totalHours}h</span>
+                      <span className="flex-1" />
+                      <span className="text-[12px] text-[#97938c] tabular-nums flex-shrink-0">{sessions}세션</span>
+                      <span className="text-[12px] text-[#97938c] tabular-nums flex-shrink-0 w-10 text-right">
+                        {subject.totalHours}h
+                      </span>
                       <span className="text-[11px] text-[#c3bfb8] group-hover:text-[#97938c] transition-colors flex-shrink-0">→</span>
                     </Link>
                   );
                 })}
               </div>
+
             </section>
           );
         })}
-
-        {/* ── 과정 운영 ── */}
-        {operationSubjects.length > 0 && (
-          <section>
-            <div className="flex gap-6 pt-10 pb-7">
-              <span className="text-[11px] font-medium text-[#97938c] tabular-nums flex-shrink-0 mt-0.5 tracking-[0.06em]">—</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-semibold text-[#1a1918] mb-2 tracking-tight">과정 운영</p>
-                <p className="text-[13px] text-[#58554f] leading-[1.85]">과정 시작·마무리 및 커리어 지원 프로그램</p>
-              </div>
-            </div>
-            <div className="border border-[#e4e1da] mb-12">
-              {operationSubjects.map((subject, i) => {
-                const sessions = subject.nodes.reduce((s, n) => s + n.lessons.length, 0);
-                return (
-                  <Link
-                    key={subject.id}
-                    href={`/curriculum/${subject.id}`}
-                    className="group flex items-center gap-4 px-6 py-3.5 border-b border-[#f0ede8] last:border-0 hover:bg-[#faf9f7] transition-colors"
-                  >
-                    <span className="text-[11px] text-[#c3bfb8] tabular-nums flex-shrink-0 font-medium w-5">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span className="text-[13px] font-medium text-[#1a1918] flex-shrink-0 tracking-tight">{subject.title}</span>
-                    {subject.category === '프로젝트' && (
-                      <span className="text-[10px] text-[#97938c] border border-[#e4e1da] px-1.5 py-0.5 flex-shrink-0 tracking-[0.08em] font-medium">
-                        프로젝트
-                      </span>
-                    )}
-                    <span className="flex-1 border-b border-dashed border-[#ece9e3] mb-[2px]" />
-                    {sessions > 0 && (
-                      <span className="text-[11px] text-[#97938c] tabular-nums flex-shrink-0">{sessions}세션</span>
-                    )}
-                    <span className="text-[12px] font-semibold text-[#3a3835] tabular-nums flex-shrink-0">{subject.totalHours}h</span>
-                    <span className="text-[11px] text-[#c3bfb8] group-hover:text-[#97938c] transition-colors flex-shrink-0">→</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
       </div>
 
     </div>

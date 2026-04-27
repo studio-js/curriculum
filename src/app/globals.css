@@ -1,5 +1,46 @@
 @import "tailwindcss";
 
+/* ── Futura Std — 알파벳·숫자만 담당 (&·기호는 Pretendard가 처리)
+   Futura는 Pretendard 동 웨이트보다 시각적으로 훨씬 무거워
+   CSS 웨이트를 한 단계 낮은 파일로 매핑해 시각 균형을 맞춤
+   300 → Light / 400·500 → Book / 600·700 → Medium / 800 → Bold ── */
+@font-face {
+  font-family: 'FuturaStd';
+  src: url('/fonts/futura/FuturaStd-Light.otf') format('opentype');
+  font-weight: 300; font-style: normal; font-display: swap;
+  unicode-range: U+0020-0025, U+0027-007E, U+00A0, U+00C0-00FF;
+}
+@font-face {
+  font-family: 'FuturaStd';
+  src: url('/fonts/futura/FuturaStd-Book.otf') format('opentype');
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0020-0025, U+0027-007E, U+00A0, U+00C0-00FF;
+}
+@font-face {
+  font-family: 'FuturaStd';
+  src: url('/fonts/futura/FuturaStd-Book.otf') format('opentype');
+  font-weight: 500; font-style: normal; font-display: swap;
+  unicode-range: U+0020-0025, U+0027-007E, U+00A0, U+00C0-00FF;
+}
+@font-face {
+  font-family: 'FuturaStd';
+  src: url('/fonts/futura/FuturaStd-Medium.otf') format('opentype');
+  font-weight: 600; font-style: normal; font-display: swap;
+  unicode-range: U+0020-0025, U+0027-007E, U+00A0, U+00C0-00FF;
+}
+@font-face {
+  font-family: 'FuturaStd';
+  src: url('/fonts/futura/FuturaStd-Medium.otf') format('opentype');
+  font-weight: 700; font-style: normal; font-display: swap;
+  unicode-range: U+0020-0025, U+0027-007E, U+00A0, U+00C0-00FF;
+}
+@font-face {
+  font-family: 'FuturaStd';
+  src: url('/fonts/futura/FuturaStd-Bold.otf') format('opentype');
+  font-weight: 800; font-style: normal; font-display: swap;
+  unicode-range: U+0020-0025, U+0027-007E, U+00A0, U+00C0-00FF;
+}
+
 :root {
   /* Surface */
   --bg: #ffffff;
@@ -16,10 +57,9 @@
   --text-muted: #97938c;
   --text-faint: #c3bfb8;
 
-  /* Font stacks */
-  --font-body: var(--font-display), var(--font-sans), sans-serif;
-  --font-num: var(--font-display), sans-serif;
-  --font-serif: var(--font-serif), Georgia, serif;
+  /* Font stacks — 알파벳/숫자: FuturaStd, 한글/기호: Pretendard */
+  --font-body: 'FuturaStd', 'Pretendard Variable', Pretendard, sans-serif;
+  --font-num:  'FuturaStd', 'Pretendard Variable', Pretendard, sans-serif;
 }
 
 @keyframes fadeIn {

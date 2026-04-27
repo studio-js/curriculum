@@ -30,6 +30,28 @@ app = Flask(__name__)
 CORS(app, origins='*')
 _ctx = {}  # 세션 내 변수 상태 유지
 
+import re as _re
+
+def _preprocess(code):
+    """!pip, !wget 등 Jupyter 셸 매직 명령어를 subprocess.run()으로 변환"""
+    lines = code.split('\\n')
+    out = []
+    for line in lines:
+        stripped = line.lstrip()
+        # 줄의 첫 비공백 문자가 ! 인 경우만 변환 (문자열 안의 !는 제외)
+        if _re.match(r'^\\s*!', line):
+            indent = line[:len(line) - len(stripped)]
+            cmd = stripped[1:].strip()
+            out.append(
+                f"{indent}import subprocess as _sp;"
+                f" _res = _sp.run({repr(cmd)}, shell=True, text=True, capture_output=True);"
+                f" print(_res.stdout, end='');"
+                f" print(_res.stderr, end='')"
+            )
+        else:
+            out.append(line)
+    return '\\n'.join(out)
+
 @app.route('/ping')
 def ping():
     return jsonify({'status': 'ok'})
@@ -37,6 +59,7 @@ def ping():
 @app.route('/execute', methods=['POST'])
 def execute():
     code = request.json.get('code', '')
+    code = _preprocess(code)  # !명령어 전처리
     old_out, old_err = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = io.StringIO(), io.StringIO()
     success, images = True, []

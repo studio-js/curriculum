@@ -40,10 +40,14 @@ export default function Header() {
                   <Link
                     key={href}
                     href={href}
-                    onClick={() => {
-                      if (active) window.scrollTo({ top: 0, behavior: 'smooth' });
+                    onClick={(e) => {
+                      if (active) {
+                        e.preventDefault();
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        router.refresh();
+                      }
                     }}
-                    className={`text-[13px] transition-colors ${
+                    className={`text-[13px] transition-colors active:scale-[0.97] ${
                       active
                         ? 'text-[#1a1918] font-medium'
                         : 'text-[#97938c] hover:text-[#3a3835]'

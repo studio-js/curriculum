@@ -6,7 +6,7 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
 export default function OnboardingPage() {
-  const { user, profile, loading, isAdmin, refreshProfile } = useAuthContext();
+  const { user, profile, loading, refreshProfile } = useAuthContext();
   const router = useRouter();
 
   const [name,  setName]  = useState('');
@@ -18,9 +18,9 @@ export default function OnboardingPage() {
     if (!user) { router.replace('/login'); return; }
     /* 이름이 이미 있으면 바로 통과 */
     if (profile?.name?.trim()) {
-      router.replace(isAdmin ? '/admin' : '/curriculum');
+      router.replace('/');
     }
-  }, [loading, user, profile, isAdmin, router]);
+  }, [loading, user, profile, router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -38,7 +38,7 @@ export default function OnboardingPage() {
       if (dbErr) throw dbErr;
 
       await refreshProfile();
-      router.replace(isAdmin ? '/admin' : '/curriculum');
+      router.replace('/');
     } catch {
       setError('저장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {

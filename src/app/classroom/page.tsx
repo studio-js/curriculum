@@ -195,16 +195,23 @@ export default function ClassroomPage() {
       {(todayNew.length > 0 || nextOpen) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
           {todayNew.length > 0 && (
-            <div className="rounded-xl bg-[#1a1918] text-white p-5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50 mb-3">오늘 새로 열림</p>
-              <div className="space-y-2">
+            <div className="rounded-xl bg-white border border-[#e4e1da] p-5 relative overflow-hidden">
+              <span className="absolute top-0 left-0 right-0 h-[2px] bg-[#1a1918]" />
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#1a1918]" />
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#1a1918]">오늘 새로 열림</p>
+                </div>
+                <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white bg-[#1a1918] px-1.5 py-0.5 rounded">NEW</span>
+              </div>
+              <div className="space-y-2.5">
                 {todayNew.slice(0, 3).map(s => {
                   const node = nodeMap.get(s.node_slug);
                   if (!node) return null;
                   return (
-                    <div key={s.node_slug + s.course_id} className="text-[13px] font-medium leading-snug">
+                    <div key={s.node_slug + s.course_id} className="text-[13px] font-medium leading-snug text-[#1a1918]">
                       <p>{node.title}</p>
-                      <p className="text-[10px] text-white/50 mt-0.5">{node.subjectTitle}</p>
+                      <p className="text-[10px] text-[#97938c] mt-0.5">{node.subjectTitle}</p>
                     </div>
                   );
                 })}
@@ -350,23 +357,30 @@ export default function ClassroomPage() {
       {/* ── 학습 트랙 ── */}
       {courses.length > 0 && (
         <section className="pb-12">
-          <div className="flex items-end justify-between mb-5">
+          <div className="flex items-end justify-between mb-1">
             <p className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.15em]">학습 트랙</p>
             <Link href="/curriculum" className="text-[11px] text-[#97938c] hover:text-[#1a1918] transition-colors">
               전체 커리큘럼 →
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {TRACKS.map(t => {
+          <div className="grid grid-cols-1 md:grid-cols-2">
+            {TRACKS.map((t, i) => {
               const subjects = t.ids.map(id => subjectMap[id]).filter(Boolean);
               const hours    = subjects.reduce((sum, s) => sum + s.totalHours, 0);
               return (
-                <div key={t.num} className="border border-[#e4e1da] rounded-xl p-5 hover:border-[#c3bfb8] transition-colors">
+                <div
+                  key={t.num}
+                  className={`px-6 pt-6 pb-7 ${
+                    i === 0 ? 'border-b border-r border-[#e4e1da]' :
+                    i === 1 ? 'border-b border-[#e4e1da]' :
+                    i === 2 ? 'border-r border-[#e4e1da]' : ''
+                  }`}
+                >
                   <div className="flex items-baseline gap-2 mb-2.5">
                     <span className="text-[11px] font-medium text-[#c3bfb8] tabular-nums">{t.num}</span>
-                    <h3 className="text-[14px] font-bold text-[#1a1918] tracking-tight">{t.title}</h3>
+                    <h3 className="text-[15px] font-bold text-[#1a1918] tracking-tight">{t.title}</h3>
                   </div>
-                  <p className="text-[12px] text-[#58554f] leading-relaxed mb-3 line-clamp-2">{t.desc}</p>
+                  <p className="text-[12.5px] text-[#58554f] leading-[1.7] mb-3">{t.desc}</p>
                   <p className="text-[10px] text-[#97938c] tabular-nums">
                     {subjects.length}개 교과목 · {hours}h
                   </p>
@@ -380,12 +394,18 @@ export default function ClassroomPage() {
       {/* ── 학습 안내 ── */}
       {courses.length > 0 && (
         <section className="pb-20">
-          <p className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.15em] mb-5">학습 안내</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <p className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.15em] mb-1">학습 안내</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 border-t border-[#e4e1da]">
             {GUIDES.map((g, i) => (
-              <div key={i} className="border border-[#e4e1da] rounded-xl p-5 bg-[#f9f8f6]">
-                <p className="text-[11px] font-semibold text-[#1a1918] tracking-tight mb-2">{g.label}</p>
-                <p className="text-[12px] text-[#58554f] leading-relaxed">{g.desc}</p>
+              <div
+                key={i}
+                className={`px-6 pt-6 pb-7 ${i < GUIDES.length - 1 ? 'md:border-r border-[#e4e1da]' : ''}`}
+              >
+                <div className="flex items-baseline gap-2 mb-2.5">
+                  <span className="text-[11px] font-medium text-[#c3bfb8] tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+                  <p className="text-[13px] font-bold text-[#1a1918] tracking-tight">{g.label}</p>
+                </div>
+                <p className="text-[12.5px] text-[#58554f] leading-[1.7]">{g.desc}</p>
               </div>
             ))}
           </div>

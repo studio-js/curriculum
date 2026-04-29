@@ -4,8 +4,8 @@ import Header from '@/components/Header';
 import { AuthProvider } from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'AI 데이터 인텔리전스 전문가 과정',
-  description: '심화 통계부터 시계열, 최신 LLM 기술을 통합해 비즈니스 난제를 정밀하게 예측/해결하는 고숙련 데이터 과학자 양성 과정',
+  title: 'MODULABS Learning',
+  description: '모두의연구소 · AI 직무 부트캠프. 데이터·AI 실무 역량을 체계적으로 학습할 수 있는 LMS.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

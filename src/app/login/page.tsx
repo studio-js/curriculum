@@ -52,11 +52,11 @@ export default function LoginPage() {
 
         {/* 헤더 */}
         <div className="text-center mb-10">
-          <p className="text-[10px] tracking-[0.22em] text-[#c3bfb8] uppercase font-medium mb-3">
-            AI 데이터 인텔리전스
+          <p className="text-[11px] tracking-[0.22em] text-[#7a766f] uppercase font-semibold mb-3">
+            MODULABS LEARNING
           </p>
-          <h1 className="text-[26px] font-bold text-[#1a1918] tracking-tight">로그인</h1>
-          <p className="text-[13px] text-[#97938c] mt-2">계속하려면 로그인하세요</p>
+          <h1 className="text-[28px] font-bold text-[#1a1918] tracking-tight">로그인</h1>
+          <p className="text-[13.5px] text-[#3a3835] mt-2">계속하려면 로그인하세요</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#e4e1da] shadow-sm p-8 space-y-5">

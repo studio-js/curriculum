@@ -1,99 +1,398 @@
+'use client';
+
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { supabase, supabaseConfigured } from '@/lib/supabase';
 import { curriculumData } from '@/data/curriculum';
 
-function getCompletion(start: string, end: string) {
-  const now = Date.now();
-  const s = new Date(start).getTime();
-  const e = new Date(end).getTime();
-  if (now <= s) return 0;
-  if (now >= e) return 100;
-  return Math.round(((now - s) / (e - s)) * 100);
+interface Course {
+  id:          string;
+  title:       string;
+  description: string | null;
+  start_date:  string | null;
+  end_date:    string | null;
 }
 
-const tracks = [
-  { num: '01', label: '데이터 엔지니어링', desc: 'Python·SQL·웹 스크레핑으로 원천 데이터를 수집하고 정제하는 파이프라인을 설계합니다.' },
-  { num: '02', label: '통계 & 머신러닝',   desc: '인과추론부터 XGBoost·LightGBM 앙상블까지 예측 모델의 핵심 이론과 실습을 다룹니다.' },
-  { num: '03', label: '시계열 & 딥러닝',   desc: 'ARIMA부터 TFT까지 통계와 딥러닝을 아우르는 시계열 분석 전 스펙트럼을 학습합니다.' },
-  { num: '04', label: 'LLM & 자동화',      desc: 'RAG·Function Calling으로 비정형 텍스트를 정형 데이터로 자동 처리하는 시스템을 구축합니다.' },
-];
+interface Enrollment {
+  student_id:   string;
+  course_id:    string;
+  status:       string;
+  enrolled_at?: string;
+}
+
+type Status = 'active' | 'upcoming' | 'ended' | 'unset';
+
+const STATUS_META: Record<Status, { label: string; dot: string; text: string }> = {
+  active:   { label: '진행중', dot: 'bg-[#1a1918]', text: 'text-[#1a1918]' },
+  upcoming: { label: '예정',   dot: 'bg-[#97938c]', text: 'text-[#97938c]' },
+  ended:    { label: '종료',   dot: 'bg-[#c3bfb8]', text: 'text-[#c3bfb8]' },
+  unset:    { label: '미설정', dot: 'bg-[#e4e1da]', text: 'text-[#c3bfb8]' },
+};
+
+async function adminFetch(url: string, token: string) {
+  return fetch(url, {
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  });
+}
+
+function courseStatus(start: string | null, end: string | null): Status {
+  if (!start) return 'unset';
+  const s = new Date(start).getTime();
+  const e = end ? new Date(end).getTime() : Infinity;
+  const n = Date.now();
+  if (n < s) return 'upcoming';
+  if (n > e) return 'ended';
+  return 'active';
+}
+
+function calcProgress(start: string | null, end: string | null) {
+  if (!start || !end) return 0;
+  const s = new Date(start).getTime();
+  const e = new Date(end).getTime();
+  const n = Date.now();
+  return Math.min(100, Math.max(0, Math.round(((n - s) / (e - s)) * 100)));
+}
+
+function calcWeek(start: string | null, end: string | null) {
+  if (!start || !end) return { current: 0, total: 0 };
+  const s = new Date(start).getTime();
+  const e = new Date(end).getTime();
+  const n = Date.now();
+  const week  = 7 * 86400000;
+  const total = Math.max(1, Math.ceil((e - s) / week));
+  if (n < s) return { current: 0, total };
+  if (n > e) return { current: total, total };
+  return { current: Math.max(1, Math.ceil((n - s) / week)), total };
+}
+
+function dDay(start: string | null) {
+  if (!start) return null;
+  const s = new Date(start).getTime();
+  const n = Date.now();
+  const d = Math.ceil((s - n) / 86400000);
+  if (d <= 0) return null;
+  return d;
+}
 
 export default function HomePage() {
-  const { course, subjects } = curriculumData;
-  const completion    = getCompletion(course.startDate, course.endDate);
-  const totalSessions = subjects.reduce(
-    (s, sub) => s + sub.nodes.reduce((ns, n) => ns + n.lessons.length, 0), 0,
-  );
-  const totalHours = subjects.reduce((s, sub) => s + sub.totalHours, 0);
+  const { user, profile, isAdmin, loading } = useAuthContext();
+  const router = useRouter();
 
-  const tooltipText = `${totalSessions}세션 · ${subjects.length}개 교과목 · ${totalHours}h · ${completion}% 완료 · ${course.startDate.slice(0, 7)} – ${course.endDate.slice(0, 7)}`;
+  const [courses,     setCourses]     = useState<Course[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [filter,      setFilter]      = useState<'all' | Status>('all');
+
+  /* 학생은 수강실로 */
+  useEffect(() => {
+    if (!loading && user && !isAdmin) router.replace('/classroom');
+  }, [loading, user, isAdmin, router]);
+
+  /* 관리자 데이터 fetch */
+  const fetchAdmin = useCallback(async () => {
+    if (!user || !isAdmin || !supabaseConfigured) return;
+    setDataLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const token = session.access_token;
+      const [cRes, eRes] = await Promise.all([
+        adminFetch('/api/admin/courses', token),
+        adminFetch('/api/admin/enrollments', token),
+      ]);
+      const [c, e] = await Promise.all([cRes.json(), eRes.json()]);
+      setCourses(c.courses ?? []);
+      setEnrollments((e.enrollments ?? []).filter((en: Enrollment) => en.status === 'active'));
+    } finally {
+      setDataLoading(false);
+    }
+  }, [user, isAdmin]);
+
+  useEffect(() => { fetchAdmin(); }, [fetchAdmin]);
+
+  /* 과정별 학생 수 */
+  const studentCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const e of enrollments) m[e.course_id] = (m[e.course_id] ?? 0) + 1;
+    return m;
+  }, [enrollments]);
+
+  /* 핵심 지표 */
+  const stats = useMemo(() => {
+    const groups: Record<Status, number> = { active: 0, upcoming: 0, ended: 0, unset: 0 };
+    for (const c of courses) groups[courseStatus(c.start_date, c.end_date)]++;
+    return {
+      totalCourses:    courses.length,
+      uniqueStudents:  new Set(enrollments.map(e => e.student_id)).size,
+      activeCount:     groups.active,
+      upcomingCount:   groups.upcoming,
+      endedCount:      groups.ended,
+    };
+  }, [courses, enrollments]);
+
+  /* 정렬: 진행중 → 예정 → 종료 → 미설정, 같은 그룹은 시작일 빠른 순 */
+  const sortedCourses = useMemo(() => {
+    const order: Record<Status, number> = { active: 0, upcoming: 1, ended: 2, unset: 3 };
+    return [...courses].sort((a, b) => {
+      const sa = courseStatus(a.start_date, a.end_date);
+      const sb = courseStatus(b.start_date, b.end_date);
+      if (order[sa] !== order[sb]) return order[sa] - order[sb];
+      return (a.start_date ?? '').localeCompare(b.start_date ?? '');
+    });
+  }, [courses]);
+
+  const filteredCourses = useMemo(() => {
+    if (filter === 'all') return sortedCourses;
+    return sortedCourses.filter(c => courseStatus(c.start_date, c.end_date) === filter);
+  }, [sortedCourses, filter]);
+
+  /* ─── early returns ─── */
+  if (!supabaseConfigured) return <Landing ctaHref="/curriculum" ctaLabel="커리큘럼 보기 →" />;
+
+  if (loading || dataLoading || (user && !isAdmin)) {
+    return (
+      <div className="min-h-[calc(100vh-60px)] flex items-center justify-center">
+        <span className="inline-block w-5 h-5 border-2 border-[#e4e1da] border-t-[#1a1918] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) return <Landing ctaHref="/login" ctaLabel="로그인하여 수강하기 →" />;
+
+  /* ─── 관리자 대시보드 ─── */
+  const today = new Date().toLocaleDateString('ko-KR', {
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
+  });
+
+  const FILTERS: Array<{ key: 'all' | Status; label: string; count: number }> = [
+    { key: 'all',      label: '전체',   count: stats.totalCourses  },
+    { key: 'active',   label: '진행중', count: stats.activeCount   },
+    { key: 'upcoming', label: '예정',   count: stats.upcomingCount },
+    { key: 'ended',    label: '종료',   count: stats.endedCount    },
+  ];
+
+  const greeting = profile?.name ? `${profile.name}님, 안녕하세요` : '안녕하세요';
 
   return (
-    <div className="max-w-4xl mx-auto px-8">
+    <div className="max-w-4xl mx-auto px-8 animate-fadeIn">
 
       {/* ── Hero ── */}
-      <section className="pt-20 pb-10">
-        <p className="text-[13px] tracking-[0.2em] text-[#97938c] uppercase mb-10 font-medium">
-          {course.jobGroup} · {course.jobRole}
+      <section className="pt-14 pb-9">
+        <p className="text-[12px] text-[#c3bfb8] tabular-nums mb-2">{today}</p>
+        <h1 className="text-[32px] font-bold text-[#1a1918] tracking-tight leading-none">{greeting}</h1>
+        <p className="text-[13px] text-[#97938c] mt-3">
+          {stats.activeCount > 0
+            ? <>현재 <strong className="text-[#1a1918] font-semibold">{stats.activeCount}개</strong> 과정이 진행 중이며, 총 <strong className="text-[#1a1918] font-semibold">{stats.uniqueStudents}명</strong>이 수강하고 있습니다.</>
+            : <>등록된 과정을 선택하거나 새 과정을 시작하세요.</>
+          }
         </p>
-
-        <h1 className="text-[46px] font-bold text-[#1a1918] leading-[1.1] tracking-tight mb-6">
-          {course.name}
-        </h1>
-
-        <p className="text-[15px] text-[#58554f] leading-[1.9] max-w-[600px] mb-9">
-          {course.goal}
-        </p>
-
-        <Link
-          href="/curriculum"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-[#1a1918] text-white text-[13px] font-medium tracking-[0.04em] rounded hover:bg-[#2f2c28] transition-colors"
-        >
-          커리큘럼 보기 →
-        </Link>
       </section>
 
-      {/* ── 진행 바 (= 섹션 구분선 + 호버 툴팁) ── */}
-      <div className="group relative py-4 cursor-default">
-        {/* 툴팁 */}
-        <div className="absolute left-0 -top-1 translate-y-[-100%] opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
-          <span className="text-[11px] text-[#97938c] tabular-nums">{tooltipText}</span>
-        </div>
-
-        {/* 바 */}
-        <div className="h-[1.5px] bg-[#e4e1da] rounded-full overflow-hidden">
-          <div
-            className="h-full bg-[#1a1918] rounded-full"
-            style={{ width: `${completion}%` }}
-          />
-        </div>
+      {/* ── 핵심 지표 strip ── */}
+      <div className="grid grid-cols-4 border-y border-[#e4e1da] mb-12">
+        {[
+          { label: '등록된 과정', value: stats.totalCourses,   unit: '개' },
+          { label: '전체 수강생', value: stats.uniqueStudents,  unit: '명' },
+          { label: '진행 중',     value: stats.activeCount,     unit: '개' },
+          { label: '예정',        value: stats.upcomingCount,   unit: '개' },
+        ].map((s, i) => (
+          <div key={i} className={`py-7 ${i === 0 ? 'pr-6' : i === 3 ? 'pl-6' : 'px-6'} ${i < 3 ? 'border-r border-[#e4e1da]' : ''}`}>
+            <p className="text-[10px] font-semibold text-[#c3bfb8] uppercase tracking-[0.12em] mb-3">{s.label}</p>
+            <p className="text-[30px] font-bold text-[#1a1918] tabular-nums leading-none">
+              {s.value}
+              <span className="text-[13px] font-medium text-[#97938c] ml-1">{s.unit}</span>
+            </p>
+          </div>
+        ))}
       </div>
 
-      {/* ── 학습 트랙 ── */}
-      <section className="pt-8 pb-20">
-        <p className="text-[10px] tracking-[0.3em] text-[#97938c] uppercase mb-8 font-medium">학습 트랙</p>
+      {/* ── 과정 ── */}
+      <section className="pb-20">
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <h2 className="text-[18px] font-bold text-[#1a1918] tracking-tight">과정</h2>
+            <p className="text-[11px] text-[#97938c] mt-1">
+              카드를 클릭하면 해당 과정의 수강생 관리로 이동합니다
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2">
-          {tracks.map((t, idx) => (
-            <div
-              key={t.num}
-              className={[
-                'flex gap-5 p-8',
-                idx < 2 ? 'border-b border-[#e4e1da]' : '',
-                idx % 2 === 0 ? 'sm:border-r border-[#e4e1da]' : '',
-              ].join(' ')}
-            >
-              <span className="text-[11px] font-medium text-[#c3bfb8] tabular-nums flex-shrink-0 mt-0.5 tracking-[0.08em]">
-                {t.num}
-              </span>
-              <div className="min-w-0">
-                <p className="text-[16px] font-semibold text-[#1a1918] mb-2.5 tracking-tight">{t.label}</p>
-                <p className="text-[13px] text-[#58554f] leading-[1.85]">{t.desc}</p>
-              </div>
-            </div>
+          {/* 필터 탭 */}
+          <div className="flex items-center gap-0.5 bg-[#f7f6f3] rounded-lg p-1">
+            {FILTERS.map(f => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`text-[11px] px-3 py-1.5 rounded-md transition-colors font-medium ${
+                  filter === f.key
+                    ? 'bg-white text-[#1a1918] shadow-sm border border-[#e4e1da]'
+                    : 'text-[#97938c] hover:text-[#1a1918]'
+                }`}
+              >
+                {f.label}
+                <span className="tabular-nums opacity-50 ml-1">{f.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 카드 그리드 (2-col) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredCourses.map(course => (
+            <AdminCourseCard
+              key={course.id}
+              course={course}
+              studentCount={studentCounts[course.id] ?? 0}
+            />
           ))}
+          {filteredCourses.length === 0 && (
+            <div className="md:col-span-2 border border-[#e4e1da] rounded-xl py-14 text-center">
+              <p className="text-[13px] text-[#97938c]">
+                {filter === 'all' ? '등록된 과정이 없습니다.' : `${STATUS_META[filter as Status]?.label} 과정이 없습니다.`}
+              </p>
+              {filter === 'all' && (
+                <p className="text-[12px] text-[#c3bfb8] mt-1">supabase-lms-setup.sql 을 실행하세요.</p>
+              )}
+            </div>
+          )}
         </div>
       </section>
+    </div>
+  );
+}
 
+/* ── 관리자용 과정 카드 ── */
+function AdminCourseCard({ course, studentCount }: { course: Course; studentCount: number }) {
+  const status   = courseStatus(course.start_date, course.end_date);
+  const meta     = STATUS_META[status];
+  const progress = calcProgress(course.start_date, course.end_date);
+  const week     = calcWeek(course.start_date, course.end_date);
+  const dday     = dDay(course.start_date);
+
+  return (
+    <div className="group border border-[#e4e1da] rounded-xl bg-white overflow-hidden hover:border-[#1a1918] transition-colors flex flex-col relative">
+
+      {/* 카드 본문(=메인 클릭 영역) */}
+      <Link
+        href={`/admin/students?course_id=${course.id}`}
+        className="p-5 flex-1 flex flex-col"
+      >
+        {/* 상단: 상태 + 우측 부가정보 */}
+        <div className="flex items-center justify-between mb-3.5">
+          <div className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+            <span className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${meta.text}`}>
+              {meta.label}
+            </span>
+          </div>
+          {status === 'active' && week.total > 0 && (
+            <span className="text-[10px] text-[#97938c] tabular-nums">
+              {week.current}주차 · {week.total}주
+            </span>
+          )}
+          {status === 'upcoming' && dday && (
+            <span className="text-[10px] font-semibold text-[#1a1918] tabular-nums tracking-tight">
+              D−{dday}
+            </span>
+          )}
+        </div>
+
+        {/* 제목 */}
+        <h3 className="text-[16px] font-bold text-[#1a1918] tracking-tight leading-snug mb-1.5 line-clamp-2">
+          {course.title}
+        </h3>
+
+        {course.description && (
+          <p className="text-[12px] text-[#58554f] leading-relaxed line-clamp-2 mb-3">
+            {course.description}
+          </p>
+        )}
+
+        {course.start_date && (
+          <p className="text-[10px] text-[#c3bfb8] tabular-nums mb-4">
+            {course.start_date} — {course.end_date}
+          </p>
+        )}
+
+        {/* 하단 메트릭 (push to bottom) */}
+        <div className="mt-auto pt-3.5 border-t border-[#f2f1ee] grid grid-cols-[1fr_auto] gap-4 items-end">
+          <div>
+            <p className="text-[10px] text-[#97938c] mb-1.5">진행률</p>
+            <div className="flex items-center gap-2">
+              <div className="flex h-[2px] flex-1 overflow-hidden bg-[#f2f1ee]">
+                <div className="bg-[#1a1918] h-full transition-all" style={{ width: `${progress}%` }} />
+              </div>
+              <span className="text-[11px] font-semibold text-[#1a1918] tabular-nums">{progress}%</span>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] text-[#97938c] mb-0.5">수강생</p>
+            <p className="text-[18px] font-bold text-[#1a1918] tabular-nums leading-none">
+              {studentCount}
+              <span className="text-[10px] font-medium text-[#97938c] ml-0.5">명</span>
+            </p>
+          </div>
+        </div>
+      </Link>
+
+      {/* 푸터 액션 (별도 링크) */}
+      <div className="border-t border-[#f2f1ee] px-4 py-2.5 flex items-center gap-3 bg-[#f9f8f6]">
+        <Link
+          href={`/curriculum?course_id=${course.id}`}
+          className="text-[11px] text-[#97938c] hover:text-[#1a1918] transition-colors"
+        >
+          커리큘럼
+        </Link>
+        <span className="text-[#e4e1da]">·</span>
+        <Link
+          href={`/admin/schedule?course_id=${course.id}`}
+          className="text-[11px] text-[#97938c] hover:text-[#1a1918] transition-colors"
+        >
+          일정 설정
+        </Link>
+        <span className="flex-1" />
+        <span className="text-[11px] text-[#c3bfb8] group-hover:text-[#1a1918] transition-colors">
+          수강생 관리 →
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ── 비로그인 랜딩 ── */
+function Landing({ ctaHref, ctaLabel }: { ctaHref: string; ctaLabel: string }) {
+  const { course } = curriculumData;
+  const stats = [
+    { label: '총 학습 시간', value: `${course.totalHours}h` },
+    { label: '프로젝트',     value: `${course.projectRatio}%` },
+    { label: '직무군',       value: course.jobGroup },
+    { label: '직무',         value: course.jobRole },
+  ];
+  return (
+    <div className="max-w-4xl mx-auto px-8">
+      <section className="pt-24 pb-12">
+        <p className="text-[11px] tracking-[0.3em] text-[#97938c] uppercase mb-4 font-medium">
+          {course.jobGroup} · {course.jobRole}
+        </p>
+        <h1 className="text-[42px] font-bold text-[#1a1918] leading-[1.1] tracking-tight mb-5">{course.name}</h1>
+        <p className="text-[14px] text-[#58554f] leading-[1.9] max-w-[560px] mb-10">{course.goal}</p>
+        <Link
+          href={ctaHref}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-[#1a1918] text-white text-[13px] font-medium tracking-[0.04em] rounded hover:bg-[#2d2b29] transition-colors"
+        >
+          {ctaLabel}
+        </Link>
+      </section>
+      <div className="border-t border-[#e4e1da]" />
+      <div className="grid grid-cols-4 py-10">
+        {stats.map((item, i) => (
+          <div key={i} className={i > 0 ? 'border-l border-[#e4e1da] pl-8' : ''}>
+            <p className="text-[10px] font-semibold text-[#c3bfb8] uppercase tracking-[0.1em] mb-1">{item.label}</p>
+            <p className="text-[16px] font-bold text-[#1a1918]">{item.value}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

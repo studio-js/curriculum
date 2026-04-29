@@ -18,6 +18,7 @@ export interface Profile {
   id:         string;
   email:      string;
   role:       UserRole;
+  name:       string | null;
   created_at: string;
 }
 

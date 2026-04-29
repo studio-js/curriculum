@@ -15,7 +15,7 @@ export default function LoginPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) router.replace('/curriculum');
+    if (!loading && user) router.replace('/onboarding');
   }, [loading, user, router]);
 
   async function handleSubmit(e: FormEvent) {
@@ -25,7 +25,7 @@ export default function LoginPage() {
     setError('');
     try {
       await login(email.trim(), password);
-      router.replace('/curriculum');
+      router.replace('/onboarding');
     } catch {
       /* 에러 내용을 그대로 노출하면 정보 유출이 되므로 항상 일반 메시지 사용 */
       setError('이메일 또는 비밀번호가 올바르지 않습니다.');

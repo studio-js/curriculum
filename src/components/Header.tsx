@@ -34,19 +34,25 @@ export default function Header() {
         <div className="flex items-center gap-7">
           {navItems.length > 0 && (
             <nav className="flex items-center gap-7">
-              {navItems.map(({ href, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`text-[13px] transition-colors ${
-                    pathname.startsWith(href)
-                      ? 'text-[#1a1918] font-medium'
-                      : 'text-[#97938c] hover:text-[#3a3835]'
-                  }`}
-                >
-                  {label}
-                </Link>
-              ))}
+              {navItems.map(({ href, label }) => {
+                const active = pathname === href || pathname.startsWith(href + '/');
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => {
+                      if (active) window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className={`text-[13px] transition-colors ${
+                      active
+                        ? 'text-[#1a1918] font-medium'
+                        : 'text-[#97938c] hover:text-[#3a3835]'
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
             </nav>
           )}
 

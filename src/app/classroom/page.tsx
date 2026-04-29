@@ -86,9 +86,11 @@ export default function ClassroomPage() {
   const router = useRouter();
 
   const [courses,         setCourses]         = useState<Course[]>([]);
+  const [pendingCourses,  setPendingCourses]  = useState<Course[]>([]);
   const [openSchedule,    setOpenSchedule]    = useState<ScheduleRow[]>([]);
   const [upcomingSchedule,setUpcomingSchedule]= useState<ScheduleRow[]>([]);
   const [fetching,        setFetching]        = useState(true);
+  const [todayDismissed,  setTodayDismissed]  = useState(false);
 
   /* 인증 가드 */
   useEffect(() => {
@@ -105,38 +107,48 @@ export default function ClassroomPage() {
       try {
         const { data: enData } = await supabase
           .from('enrollments')
-          .select('course_id')
+          .select('course_id, status')
           .eq('student_id', user.id)
-          .eq('status', 'active');
+          .in('status', ['active', 'pending']);
 
-        const ids = (enData ?? []).map(e => e.course_id as string);
-        if (!ids.length) { setFetching(false); return; }
+        const all = (enData ?? []) as Array<{ course_id: string; status: string }>;
+        const activeIds  = all.filter(e => e.status === 'active' ).map(e => e.course_id);
+        const pendingIds = all.filter(e => e.status === 'pending').map(e => e.course_id);
+
+        const allIds = [...new Set([...activeIds, ...pendingIds])];
+        if (!allIds.length) { setFetching(false); return; }
 
         const nowIso = new Date().toISOString();
-        const [{ data: cData }, { data: openData }, { data: upData }] = await Promise.all([
+        const [{ data: cData }, openRes, upRes] = await Promise.all([
           supabase
             .from('courses')
             .select('id, title, start_date, end_date')
-            .in('id', ids)
+            .in('id', allIds)
             .order('start_date', { ascending: true }),
-          supabase
-            .from('node_schedule')
-            .select('node_slug, available_from, course_id')
-            .in('course_id', ids)
-            .lte('available_from', nowIso)
-            .order('available_from', { ascending: false }),
-          supabase
-            .from('node_schedule')
-            .select('node_slug, available_from, course_id')
-            .in('course_id', ids)
-            .gt('available_from', nowIso)
-            .order('available_from', { ascending: true })
-            .limit(10),
+          activeIds.length
+            ? supabase
+                .from('node_schedule')
+                .select('node_slug, available_from, course_id')
+                .in('course_id', activeIds)
+                .lte('available_from', nowIso)
+                .order('available_from', { ascending: false })
+            : Promise.resolve({ data: [] as ScheduleRow[] }),
+          activeIds.length
+            ? supabase
+                .from('node_schedule')
+                .select('node_slug, available_from, course_id')
+                .in('course_id', activeIds)
+                .gt('available_from', nowIso)
+                .order('available_from', { ascending: true })
+                .limit(10)
+            : Promise.resolve({ data: [] as ScheduleRow[] }),
         ]);
 
-        setCourses(cData ?? []);
-        setOpenSchedule(openData ?? []);
-        setUpcomingSchedule(upData ?? []);
+        const allCourses = (cData ?? []) as Course[];
+        setCourses(allCourses.filter(c => activeIds.includes(c.id)));
+        setPendingCourses(allCourses.filter(c => pendingIds.includes(c.id)));
+        setOpenSchedule(openRes.data ?? []);
+        setUpcomingSchedule(upRes.data ?? []);
       } finally {
         setFetching(false);
       }
@@ -150,6 +162,19 @@ export default function ClassroomPage() {
   );
 
   const nextOpen = upcomingSchedule[0];
+
+  /* 오늘 알림 dismiss 상태: localStorage(today-dismissed-YYYY-MM-DD) */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setTodayDismissed(localStorage.getItem(`today-dismissed-${todayStr}`) === '1');
+  }, [todayStr]);
+
+  function dismissToday() {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`today-dismissed-${todayStr}`, '1');
+    }
+    setTodayDismissed(true);
+  }
 
   if (loading || fetching) {
     return (
@@ -172,46 +197,80 @@ export default function ClassroomPage() {
 
       {/* ── Hero ── */}
       <section className="pt-14 pb-8">
-        <p className="text-[12px] text-[#c3bfb8] mb-2 tabular-nums">{today}</p>
-        <h1 className="text-[32px] font-bold text-[#1a1918] tracking-tight leading-none">
+        <p className="text-[13.5px] text-[#7a766f] mb-2 tabular-nums">{today}</p>
+        <h1 className="text-[34px] font-bold text-[#1a1918] tracking-tight leading-none">
           {profile?.name ? `${profile.name}님, 안녕하세요` : '안녕하세요'}
         </h1>
         {courses.length > 0 && (
-          <p className="text-[13px] text-[#97938c] mt-3">
+          <p className="text-[14.5px] text-[#3a3835] mt-3">
             {courses.length}개 과정 수강 중 · 현재 <strong className="text-[#1a1918] font-semibold">{totalOpen}개</strong> 콘텐츠가 열려있습니다
+          </p>
+        )}
+        {courses.length === 0 && pendingCourses.length > 0 && (
+          <p className="text-[14.5px] text-[#3a3835] mt-3">
+            <strong className="text-[#1a1918] font-semibold">{pendingCourses.length}개</strong> 과정의 승인을 기다리고 있습니다
           </p>
         )}
       </section>
 
-      {/* ── 수강 과정 없음 ── */}
-      {courses.length === 0 && (
-        <div className="border border-[#e4e1da] rounded-xl py-16 text-center mb-10">
-          <p className="text-[14px] font-medium text-[#58554f]">수강 중인 과정이 없습니다</p>
-          <p className="text-[12px] text-[#c3bfb8] mt-2">담당자에게 과정 등록을 요청하세요.</p>
+      {/* ── 신청 대기 중 (pending) ── */}
+      {pendingCourses.length > 0 && (
+        <section className="mb-10">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-[16px] font-bold text-[#1a1918] tracking-tight">신청 대기 중</h2>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3a3835] border border-[#3a3835] px-1.5 py-0.5 rounded leading-none">PENDING</span>
+          </div>
+          <div className="space-y-2.5">
+            {pendingCourses.map(c => (
+              <div key={c.id} className="border border-[#d4d0c8] rounded-xl bg-white p-5 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[15px] font-semibold text-[#1a1918] tracking-tight">{c.title}</p>
+                  {c.start_date && (
+                    <p className="text-[12.5px] text-[#7a766f] tabular-nums mt-1">{c.start_date} — {c.end_date}</p>
+                  )}
+                </div>
+                <p className="text-[12px] text-[#7a766f] flex-shrink-0">관리자 승인 대기 중</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── 수강·신청 둘 다 없음 ── */}
+      {courses.length === 0 && pendingCourses.length === 0 && (
+        <div className="border border-[#d4d0c8] rounded-xl py-16 text-center mb-10">
+          <p className="text-[15px] font-semibold text-[#1a1918]">수강 중인 과정이 없습니다</p>
+          <p className="text-[13px] text-[#7a766f] mt-2">관리자에게 과정 등록을 요청하거나 새로 신청해주세요.</p>
         </div>
       )}
 
       {/* ── 오늘 새로 열림 / 다음 오픈 strip ── */}
-      {(todayNew.length > 0 || nextOpen) && (
+      {((todayNew.length > 0 && !todayDismissed) || nextOpen) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
-          {todayNew.length > 0 && (
-            <div className="rounded-xl bg-white border border-[#e4e1da] p-5 relative overflow-hidden">
-              <span className="absolute top-0 left-0 right-0 h-[2px] bg-[#1a1918]" />
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#1a1918]" />
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#1a1918]">오늘 새로 열림</p>
-                </div>
-                <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white bg-[#1a1918] px-1.5 py-0.5 rounded">NEW</span>
+          {todayNew.length > 0 && !todayDismissed && (
+            <div className="rounded-xl bg-white border border-[#e4e1da] p-5 relative">
+              <button
+                onClick={dismissToday}
+                aria-label="알림 닫기"
+                className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center text-[#a8a39c] hover:text-[#1a1918] hover:bg-[#f2f1ee] rounded transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1 1L9 9M1 9L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1a1918]" />
+                <p className="text-[13px] font-semibold text-[#1a1918] tracking-tight">오늘 새로 열림</p>
+                <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#3a3835] border border-[#3a3835] px-1.5 py-0.5 rounded">NEW</span>
               </div>
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {todayNew.slice(0, 3).map(s => {
                   const node = nodeMap.get(s.node_slug);
                   if (!node) return null;
                   return (
-                    <div key={s.node_slug + s.course_id} className="text-[13px] font-medium leading-snug text-[#1a1918]">
-                      <p>{node.title}</p>
-                      <p className="text-[10px] text-[#97938c] mt-0.5">{node.subjectTitle}</p>
+                    <div key={s.node_slug + s.course_id} className="leading-snug">
+                      <p className="text-[14.5px] font-semibold text-[#1a1918]">{node.title}</p>
+                      <p className="text-[12.5px] text-[#7a766f] mt-0.5">{node.subjectTitle}</p>
                     </div>
                   );
                 })}
@@ -224,14 +283,14 @@ export default function ClassroomPage() {
             const d    = dDay(nextOpen.available_from);
             if (!node) return null;
             return (
-              <div className="rounded-xl border border-[#e4e1da] p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c3bfb8]">다음 오픈</p>
-                  <span className="text-[11px] font-bold text-[#1a1918] tabular-nums tracking-tight">D−{d}</span>
+              <div className="rounded-xl bg-white border border-[#e4e1da] p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[13px] font-semibold text-[#3a3835] tracking-tight">다음 오픈</p>
+                  <span className="text-[13px] font-bold text-[#1a1918] tabular-nums tracking-tight">D−{d}</span>
                 </div>
-                <p className="text-[13px] font-medium text-[#1a1918] leading-snug">{node.title}</p>
-                <p className="text-[11px] text-[#97938c] mt-1">{node.subjectTitle}</p>
-                <p className="text-[10px] text-[#c3bfb8] tabular-nums mt-2">
+                <p className="text-[14.5px] font-semibold text-[#1a1918] leading-snug">{node.title}</p>
+                <p className="text-[12.5px] text-[#7a766f] mt-1">{node.subjectTitle}</p>
+                <p className="text-[12px] text-[#a8a39c] tabular-nums mt-2">
                   {nextOpen.available_from.slice(0, 10)}
                 </p>
               </div>
@@ -243,7 +302,7 @@ export default function ClassroomPage() {
       {/* ── 과정 카드 목록 ── */}
       {courses.length > 0 && (
         <section className="pb-12">
-          <p className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.15em] mb-4">수강 중인 과정</p>
+          <h2 className="text-[18px] font-bold text-[#1a1918] tracking-tight mb-5">수강 중인 과정</h2>
 
           <div className="space-y-4">
             {courses.map(course => {
@@ -265,25 +324,25 @@ export default function ClassroomPage() {
                   <div className="p-6 pb-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-semibold text-[#c3bfb8] uppercase tracking-[0.12em] mb-2">수강 중</p>
-                        <h2 className="text-[18px] font-bold text-[#1a1918] tracking-tight mb-1">{course.title}</h2>
+                        <p className="text-[12px] font-semibold text-[#7a766f] uppercase tracking-[0.12em] mb-2">수강 중</p>
+                        <h3 className="text-[20px] font-bold text-[#1a1918] tracking-tight mb-1.5">{course.title}</h3>
                         {course.start_date && (
-                          <p className="text-[11px] text-[#c3bfb8] tabular-nums">
+                          <p className="text-[12.5px] text-[#a8a39c] tabular-nums">
                             {course.start_date} — {course.end_date}
                           </p>
                         )}
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-[28px] font-bold text-[#1a1918] tabular-nums leading-none">{courseOpens.length}</p>
-                        <p className="text-[10px] text-[#97938c] mt-0.5">콘텐츠 열림</p>
+                        <p className="text-[30px] font-bold text-[#1a1918] tabular-nums leading-none">{courseOpens.length}</p>
+                        <p className="text-[12px] text-[#7a766f] mt-1">콘텐츠 열림</p>
                       </div>
                     </div>
 
                     {/* 진행률 */}
                     <div className="mt-5">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <p className="text-[10px] text-[#97938c]">과정 진행률</p>
-                        <p className="text-[10px] font-semibold text-[#1a1918] tabular-nums">{progress}%</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[12.5px] text-[#3a3835]">과정 진행률</p>
+                        <p className="text-[12.5px] font-semibold text-[#1a1918] tabular-nums">{progress}%</p>
                       </div>
                       <div className="flex h-[2px] w-full overflow-hidden bg-[#f2f1ee]">
                         <div className="bg-[#1a1918] h-full" style={{ width: `${progress}%` }} />
@@ -293,22 +352,22 @@ export default function ClassroomPage() {
 
                   {/* 최근 열린 콘텐츠 */}
                   {recentOpens.length > 0 && (
-                    <div className="border-t border-[#f2f1ee] px-6 py-4">
-                      <p className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.1em] mb-3">최근 열린 콘텐츠</p>
-                      <div className="space-y-2">
+                    <div className="border-t border-[#f2f1ee] px-6 py-5">
+                      <p className="text-[13px] font-semibold text-[#1a1918] tracking-tight mb-3">최근 열린 콘텐츠</p>
+                      <div className="space-y-3">
                         {recentOpens.map(item => (
                           <div key={item.slug} className="flex items-center gap-3">
-                            <span className={`w-1 h-1 rounded-full flex-shrink-0 ${item.isToday ? 'bg-[#1a1918]' : 'bg-[#c3bfb8]'}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${item.isToday ? 'bg-[#1a1918]' : 'bg-[#c3bfb8]'}`} />
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <p className="text-[12px] font-medium text-[#1a1918] truncate">{item.node!.title}</p>
+                                <p className="text-[13.5px] font-medium text-[#1a1918] truncate">{item.node!.title}</p>
                                 {item.isToday && (
-                                  <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white bg-[#1a1918] px-1.5 py-0.5 rounded flex-shrink-0">NEW</span>
+                                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3a3835] border border-[#3a3835] px-1.5 py-0.5 rounded flex-shrink-0 leading-none">NEW</span>
                                 )}
                               </div>
-                              <p className="text-[10px] text-[#c3bfb8]">{item.node!.subjectTitle}</p>
+                              <p className="text-[12px] text-[#7a766f] mt-0.5">{item.node!.subjectTitle}</p>
                             </div>
-                            <span className="text-[10px] text-[#c3bfb8] tabular-nums flex-shrink-0">{item.date}</span>
+                            <span className="text-[12px] text-[#a8a39c] tabular-nums flex-shrink-0">{item.date}</span>
                           </div>
                         ))}
                       </div>
@@ -318,7 +377,7 @@ export default function ClassroomPage() {
                   {/* 콘텐츠가 아직 없는 경우 안내 */}
                   {recentOpens.length === 0 && (
                     <div className="border-t border-[#f2f1ee] px-6 py-5 bg-[#fafaf8]">
-                      <p className="text-[12px] text-[#97938c]">
+                      <p className="text-[13.5px] text-[#3a3835]">
                         아직 열린 콘텐츠가 없습니다. 일정에 맞춰 순차적으로 공개됩니다.
                       </p>
                     </div>
@@ -330,20 +389,20 @@ export default function ClassroomPage() {
                     const d    = dDay(courseNext.available_from);
                     if (!node) return null;
                     return (
-                      <div className="border-t border-[#f2f1ee] px-6 py-3 flex items-center gap-3 bg-[#f9f8f6]">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#c3bfb8]">다음</span>
-                        <p className="text-[12px] text-[#58554f] truncate flex-1 min-w-0">{node.title}</p>
-                        <span className="text-[10px] font-bold text-[#1a1918] tabular-nums flex-shrink-0">D−{d}</span>
+                      <div className="border-t border-[#f2f1ee] px-6 py-3.5 flex items-center gap-3 bg-[#f9f8f6]">
+                        <span className="text-[12.5px] font-semibold text-[#3a3835]">다음</span>
+                        <p className="text-[13.5px] text-[#1a1918] truncate flex-1 min-w-0">{node.title}</p>
+                        <span className="text-[12px] font-bold text-[#1a1918] tabular-nums flex-shrink-0">D−{d}</span>
                       </div>
                     );
                   })()}
 
                   {/* 푸터 (CTA) */}
-                  <div className="border-t border-[#f2f1ee] px-6 py-3 bg-white flex items-center justify-between">
-                    <span className="text-[12px] font-semibold text-[#1a1918] group-hover:underline">
+                  <div className="border-t border-[#f2f1ee] px-6 py-3.5 bg-white flex items-center justify-between">
+                    <span className="text-[13.5px] font-semibold text-[#1a1918] group-hover:underline">
                       커리큘럼 전체 보기 →
                     </span>
-                    <span className="text-[10px] text-[#c3bfb8] tabular-nums">
+                    <span className="text-[12px] text-[#a8a39c] tabular-nums">
                       {totalNodes}개 노드 · {totalHours}h
                     </span>
                   </div>
@@ -357,9 +416,9 @@ export default function ClassroomPage() {
       {/* ── 학습 트랙 ── */}
       {courses.length > 0 && (
         <section className="pb-12">
-          <div className="flex items-end justify-between mb-1">
-            <p className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.15em]">학습 트랙</p>
-            <Link href="/curriculum" className="text-[11px] text-[#97938c] hover:text-[#1a1918] transition-colors">
+          <div className="flex items-end justify-between mb-5">
+            <h2 className="text-[18px] font-bold text-[#1a1918] tracking-tight">학습 트랙</h2>
+            <Link href="/curriculum" className="text-[13px] text-[#7a766f] hover:text-[#1a1918] transition-colors">
               전체 커리큘럼 →
             </Link>
           </div>
@@ -376,12 +435,12 @@ export default function ClassroomPage() {
                     i === 2 ? 'border-r border-[#e4e1da]' : ''
                   }`}
                 >
-                  <div className="flex items-baseline gap-2 mb-2.5">
-                    <span className="text-[11px] font-medium text-[#c3bfb8] tabular-nums">{t.num}</span>
-                    <h3 className="text-[15px] font-bold text-[#1a1918] tracking-tight">{t.title}</h3>
+                  <div className="flex items-baseline gap-2.5 mb-3">
+                    <span className="text-[13px] font-medium text-[#a8a39c] tabular-nums">{t.num}</span>
+                    <h3 className="text-[17px] font-bold text-[#1a1918] tracking-tight">{t.title}</h3>
                   </div>
-                  <p className="text-[12.5px] text-[#58554f] leading-[1.7] mb-3">{t.desc}</p>
-                  <p className="text-[10px] text-[#97938c] tabular-nums">
+                  <p className="text-[14px] text-[#3a3835] leading-[1.7] mb-3.5">{t.desc}</p>
+                  <p className="text-[12.5px] text-[#7a766f] tabular-nums">
                     {subjects.length}개 교과목 · {hours}h
                   </p>
                 </div>
@@ -394,18 +453,18 @@ export default function ClassroomPage() {
       {/* ── 학습 안내 ── */}
       {courses.length > 0 && (
         <section className="pb-20">
-          <p className="text-[10px] font-semibold text-[#97938c] uppercase tracking-[0.15em] mb-1">학습 안내</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 border-t border-[#e4e1da]">
+          <h2 className="text-[18px] font-bold text-[#1a1918] tracking-tight mb-5">학습 안내</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3">
             {GUIDES.map((g, i) => (
               <div
                 key={i}
                 className={`px-6 pt-6 pb-7 ${i < GUIDES.length - 1 ? 'md:border-r border-[#e4e1da]' : ''}`}
               >
-                <div className="flex items-baseline gap-2 mb-2.5">
-                  <span className="text-[11px] font-medium text-[#c3bfb8] tabular-nums">{String(i + 1).padStart(2, '0')}</span>
-                  <p className="text-[13px] font-bold text-[#1a1918] tracking-tight">{g.label}</p>
+                <div className="flex items-baseline gap-2.5 mb-3">
+                  <span className="text-[13px] font-medium text-[#a8a39c] tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+                  <p className="text-[15px] font-bold text-[#1a1918] tracking-tight">{g.label}</p>
                 </div>
-                <p className="text-[12.5px] text-[#58554f] leading-[1.7]">{g.desc}</p>
+                <p className="text-[14px] text-[#3a3835] leading-[1.7]">{g.desc}</p>
               </div>
             ))}
           </div>

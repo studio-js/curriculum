@@ -79,12 +79,31 @@ export async function DELETE(req: Request) {
   }
 
   const admin = createAdminClient();
-  const { error } = await admin
-    .from('enrollments')
-    .update({ status: 'removed', removed_at: new Date().toISOString() })
-    .eq('student_id', student_id)
-    .eq('course_id', course_id);
 
-  if (error) return json({ error: '제거에 실패했습니다.' }, 500);
+  /* 현재 status 확인 */
+  const { data: existing } = await admin
+    .from('enrollments')
+    .select('status')
+    .eq('student_id', student_id)
+    .eq('course_id',  course_id)
+    .maybeSingle();
+
+  /* pending → 하드 삭제 (재신청 가능하도록), active → 소프트 삭제 */
+  if (existing?.status === 'pending') {
+    const { error } = await admin
+      .from('enrollments')
+      .delete()
+      .eq('student_id', student_id)
+      .eq('course_id',  course_id);
+    if (error) return json({ error: '거절에 실패했습니다.' }, 500);
+  } else {
+    const { error } = await admin
+      .from('enrollments')
+      .update({ status: 'removed', removed_at: new Date().toISOString() })
+      .eq('student_id', student_id)
+      .eq('course_id',  course_id);
+    if (error) return json({ error: '제거에 실패했습니다.' }, 500);
+  }
+
   return json({ error: null });
 }

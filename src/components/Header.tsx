@@ -37,24 +37,22 @@ export default function Header() {
               {navItems.map(({ href, label }) => {
                 const active = pathname === href || pathname.startsWith(href + '/');
                 return (
-                  <Link
+                  <button
                     key={href}
-                    href={href}
-                    onClick={(e) => {
-                      if (active) {
-                        e.preventDefault();
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                        router.refresh();
-                      }
+                    type="button"
+                    onClick={() => {
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      if (active) router.refresh();
+                      else        router.push(href);
                     }}
                     className={`text-[13px] transition-colors active:scale-[0.97] ${
                       active
-                        ? 'text-[#1a1918] font-medium'
-                        : 'text-[#97938c] hover:text-[#3a3835]'
+                        ? 'text-[#1a1918] font-semibold'
+                        : 'text-[#7a766f] hover:text-[#1a1918]'
                     }`}
                   >
                     {label}
-                  </Link>
+                  </button>
                 );
               })}
             </nav>
@@ -68,14 +66,14 @@ export default function Header() {
                     {profile?.name ?? profile?.email ?? user.email}
                   </p>
                   {profile?.role && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-[#c3bfb8] text-[#3a3835] leading-none tracking-[0.04em]">
+                    <span className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded border border-[#a8a39c] text-[#3a3835] leading-none tracking-[0.04em]">
                       {profile.role === 'admin' ? '관리자' : '수강생'}
                     </span>
                   )}
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="text-[12px] text-[#97938c] hover:text-[#1a1918] transition-colors"
+                  className="text-[13px] text-[#7a766f] hover:text-[#1a1918] transition-colors"
                 >
                   로그아웃
                 </button>

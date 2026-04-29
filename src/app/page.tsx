@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
-import { curriculumData } from '@/data/curriculum';
 
 interface Course {
   id:          string;
@@ -360,39 +359,68 @@ function AdminCourseCard({ course, studentCount }: { course: Course; studentCoun
   );
 }
 
-/* ── 비로그인 랜딩 ── */
+/* ── 비로그인 랜딩 (브랜드 일반 페이지, 특정 과정 노출 X) ── */
 function Landing({ ctaHref, ctaLabel }: { ctaHref: string; ctaLabel: string }) {
-  const { course } = curriculumData;
-  const stats = [
-    { label: '총 학습 시간', value: `${course.totalHours}h` },
-    { label: '프로젝트',     value: `${course.projectRatio}%` },
-    { label: '직무군',       value: course.jobGroup },
-    { label: '직무',         value: course.jobRole },
+  const features = [
+    {
+      label: '실무 중심',
+      desc:  '현직 데이터 과학자가 직접 설계한 커리큘럼으로 실제 비즈니스 문제 해결 역량을 기릅니다.',
+    },
+    {
+      label: '프로젝트 기반',
+      desc:  '이론과 실습이 결합된 노트북 형태의 학습. 코드를 직접 실행하며 체득합니다.',
+    },
+    {
+      label: '단계별 오픈',
+      desc:  '진도에 맞춰 콘텐츠가 순차적으로 공개되어 부담 없이 학습 흐름을 따라갈 수 있습니다.',
+    },
   ];
+
   return (
     <div className="max-w-4xl mx-auto px-8">
-      <section className="pt-24 pb-12">
-        <p className="text-[11px] tracking-[0.3em] text-[#97938c] uppercase mb-4 font-medium">
-          {course.jobGroup} · {course.jobRole}
+      {/* Hero */}
+      <section className="pt-24 pb-16 text-center">
+        <p className="text-[12px] tracking-[0.22em] text-[#7a766f] uppercase mb-5 font-semibold">
+          MODULABS LEARNING
         </p>
-        <h1 className="text-[42px] font-bold text-[#1a1918] leading-[1.1] tracking-tight mb-5">{course.name}</h1>
-        <p className="text-[14px] text-[#58554f] leading-[1.9] max-w-[560px] mb-10">{course.goal}</p>
+        <h1 className="text-[44px] font-bold text-[#1a1918] leading-[1.15] tracking-tight mb-6 max-w-[620px] mx-auto">
+          AI 직무 부트캠프, 모두의연구소에서.
+        </h1>
+        <p className="text-[15px] text-[#3a3835] leading-[1.85] max-w-[540px] mx-auto mb-10">
+          현직자가 만드는 커리큘럼으로 데이터·AI 실무 역량을 체계적으로 성장시킵니다.
+          참여 중인 과정에 로그인하여 학습을 시작하세요.
+        </p>
         <Link
           href={ctaHref}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-[#1a1918] text-white text-[13px] font-medium tracking-[0.04em] rounded hover:bg-[#2d2b29] transition-colors"
+          className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#1a1918] text-white text-[14px] font-semibold tracking-[0.02em] rounded-lg hover:bg-[#2d2b29] transition-colors"
         >
           {ctaLabel}
         </Link>
       </section>
-      <div className="border-t border-[#e4e1da]" />
-      <div className="grid grid-cols-4 py-10">
-        {stats.map((item, i) => (
-          <div key={i} className={i > 0 ? 'border-l border-[#e4e1da] pl-8' : ''}>
-            <p className="text-[10px] font-semibold text-[#c3bfb8] uppercase tracking-[0.1em] mb-1">{item.label}</p>
-            <p className="text-[16px] font-bold text-[#1a1918]">{item.value}</p>
-          </div>
-        ))}
-      </div>
+
+      <div className="border-t border-[#d4d0c8]" />
+
+      {/* Features */}
+      <section className="py-14">
+        <div className="grid grid-cols-1 md:grid-cols-3">
+          {features.map((f, i) => (
+            <div
+              key={i}
+              className={`px-7 py-2 ${i < features.length - 1 ? 'md:border-r border-[#d4d0c8]' : ''}`}
+            >
+              <p className="text-[13px] tracking-[0.05em] text-[#a8a39c] tabular-nums mb-3 font-semibold">
+                0{i + 1}
+              </p>
+              <h3 className="text-[16px] font-bold text-[#1a1918] tracking-tight mb-2.5">
+                {f.label}
+              </h3>
+              <p className="text-[13.5px] text-[#3a3835] leading-[1.75]">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="pb-16" />
     </div>
   );
 }

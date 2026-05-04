@@ -83,6 +83,13 @@ export default function HomePage() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [filter,      setFilter]      = useState<'all' | Status>('all');
+  const [createOpen,  setCreateOpen]  = useState(false);
+  const [createBusy,  setCreateBusy]  = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [newTitle,    setNewTitle]    = useState('');
+  const [newDesc,     setNewDesc]     = useState('');
+  const [newStart,    setNewStart]    = useState('');
+  const [newEnd,      setNewEnd]      = useState('');
 
   /* 학생은 수강실로 */
   useEffect(() => {
@@ -110,6 +117,38 @@ export default function HomePage() {
   }, [user, isAdmin]);
 
   useEffect(() => { fetchAdmin(); }, [fetchAdmin]);
+
+  async function handleCreateCourse() {
+    const title = newTitle.trim();
+    if (!title) { setCreateError('과정명을 입력해주세요.'); return; }
+    setCreateBusy(true);
+    setCreateError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('no session');
+      const res = await fetch('/api/admin/courses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          title,
+          description: newDesc.trim() || null,
+          start_date:  newStart || null,
+          end_date:    newEnd   || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setCreateOpen(false);
+      setNewTitle(''); setNewDesc(''); setNewStart(''); setNewEnd('');
+      fetchAdmin();
+    } catch {
+      setCreateError('생성에 실패했습니다.');
+    } finally {
+      setCreateBusy(false);
+    }
+  }
 
   /* 과정별 학생 수 */
   const studentCounts = useMemo(() => {
@@ -209,7 +248,7 @@ export default function HomePage() {
 
       {/* ── 과정 ── */}
       <section className="pb-20">
-        <div className="flex items-end justify-between mb-5">
+        <div className="flex items-end justify-between mb-5 gap-4 flex-wrap">
           <div>
             <h2 className="text-[18px] font-bold text-[#1a1918] tracking-tight">과정</h2>
             <p className="text-[11px] text-[#97938c] mt-1">
@@ -217,22 +256,31 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* 필터 탭 */}
-          <div className="flex items-center gap-0.5 bg-[#f7f6f3] rounded-lg p-1">
-            {FILTERS.map(f => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`text-[11px] px-3 py-1.5 rounded-md transition-colors font-medium ${
-                  filter === f.key
-                    ? 'bg-white text-[#1a1918] shadow-sm border border-[#e4e1da]'
-                    : 'text-[#97938c] hover:text-[#1a1918]'
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="text-[12px] font-semibold px-3.5 py-1.5 rounded-md border border-[#1a1918] text-[#1a1918] hover:bg-[#1a1918] hover:text-white transition-colors"
+            >
+              + 새 과정
+            </button>
+
+            {/* 필터 탭 */}
+            <div className="flex items-center gap-0.5 bg-[#f7f6f3] rounded-lg p-1">
+              {FILTERS.map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  className={`text-[11px] px-3 py-1.5 rounded-md transition-colors font-medium ${
+                    filter === f.key
+                      ? 'bg-white text-[#1a1918] shadow-sm border border-[#e4e1da]'
+                      : 'text-[#97938c] hover:text-[#1a1918]'
                 }`}
               >
                 {f.label}
                 <span className="tabular-nums opacity-50 ml-1">{f.count}</span>
               </button>
             ))}
+            </div>
           </div>
         </div>
 
@@ -257,6 +305,95 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {/* ── 새 과정 생성 모달 ── */}
+      {createOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center px-4"
+          onClick={() => !createBusy && setCreateOpen(false)}
+        >
+          <div
+            className="w-full max-w-[440px] bg-white rounded-2xl border border-[#d4d0c8] p-7 space-y-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <p className="text-[12px] tracking-[0.16em] text-[#7a766f] uppercase font-semibold mb-2">
+                새 과정 생성
+              </p>
+              <h2 className="text-[22px] font-bold text-[#1a1918] tracking-tight">과정 추가</h2>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[12.5px] font-semibold text-[#1a1918]">
+                과정명 <span className="text-[#b04030]">*</span>
+              </label>
+              <input
+                type="text"
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                placeholder="예: AI 데이터 인텔리전스 전문가 과정"
+                className="w-full text-[14px] border border-[#d4d0c8] rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#1a1918] text-[#1a1918] placeholder-[#a8a39c] transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[12.5px] font-semibold text-[#1a1918]">설명</label>
+              <textarea
+                value={newDesc}
+                onChange={e => setNewDesc(e.target.value)}
+                placeholder="과정 목표·특징을 한 문장으로"
+                rows={2}
+                className="w-full text-[13.5px] border border-[#d4d0c8] rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#1a1918] text-[#1a1918] placeholder-[#a8a39c] resize-none transition-colors"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="block text-[12.5px] font-semibold text-[#1a1918]">시작일</label>
+                <input
+                  type="date"
+                  value={newStart}
+                  onChange={e => setNewStart(e.target.value)}
+                  className="w-full text-[13.5px] border border-[#d4d0c8] rounded-lg px-3 py-2 focus:outline-none focus:border-[#1a1918] text-[#1a1918] tabular-nums transition-colors"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-[12.5px] font-semibold text-[#1a1918]">종료일</label>
+                <input
+                  type="date"
+                  value={newEnd}
+                  onChange={e => setNewEnd(e.target.value)}
+                  className="w-full text-[13.5px] border border-[#d4d0c8] rounded-lg px-3 py-2 focus:outline-none focus:border-[#1a1918] text-[#1a1918] tabular-nums transition-colors"
+                />
+              </div>
+            </div>
+
+            {createError && (
+              <div className="px-3 py-2.5 rounded-lg bg-[#fdf5f3] border border-[#e8b4a8]">
+                <p className="text-[12.5px] text-[#b04030]">{createError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleCreateCourse}
+                disabled={createBusy || !newTitle.trim()}
+                className="flex-1 text-[13.5px] font-semibold py-2.5 rounded-lg bg-[#1a1918] text-white hover:bg-[#2d2b29] disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+              >
+                {createBusy && <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+                과정 생성
+              </button>
+              <button
+                onClick={() => setCreateOpen(false)}
+                disabled={createBusy}
+                className="text-[13.5px] px-4 py-2.5 rounded-lg border border-[#d4d0c8] text-[#3a3835] hover:text-[#1a1918] hover:border-[#1a1918] disabled:opacity-40 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -338,7 +475,7 @@ function AdminCourseCard({ course, studentCount }: { course: Course; studentCoun
       {/* 푸터 액션 (별도 링크) */}
       <div className="border-t border-[#f2f1ee] px-4 py-2.5 flex items-center gap-3 bg-[#f9f8f6]">
         <Link
-          href={`/curriculum?course_id=${course.id}`}
+          href={`/admin/curriculum?course_id=${course.id}`}
           className="text-[11px] text-[#97938c] hover:text-[#1a1918] transition-colors"
         >
           커리큘럼

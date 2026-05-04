@@ -3,15 +3,23 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { curriculumData } from '@/data/curriculum';
 
 interface Course { id: string; title: string; start_date: string | null; end_date: string | null; }
 interface NodeScheduleEntry { node_slug: string; available_from: string | null; }
+interface DbSubject { id: string; slug: string; title: string; category: string; description: string | null; total_hours: number; position: number; }
+interface DbNode    { id: string; slug: string; subject_id: string; title: string; description: string | null; hours: number; position: number; }
 
 const INTERVALS = [
   { label: '매주',  days: 7  },
   { label: '격주',  days: 14 },
   { label: '4주',   days: 28 },
+];
+
+/* 카테고리 표시 순서 + 라벨 */
+const CATEGORY_ORDER: Array<{ key: string; label: string; description: string }> = [
+  { key: '정규교과', label: '정규교과',   description: '본 커리큘럼의 핵심 교과' },
+  { key: '프로젝트', label: '프로젝트',   description: '실전 적용·통합 프로젝트' },
+  { key: '기타',     label: '운영·기타', description: '온보딩·세미나·운영 콘텐츠' },
 ];
 
 function addDays(dateStr: string, days: number): string {
@@ -43,17 +51,14 @@ async function adminFetch(url: string, options?: RequestInit) {
   });
 }
 
-/* Flat list of all nodes with their parent subject info */
-const allNodes = curriculumData.subjects.flatMap(s =>
-  s.nodes.map(n => ({
-    subjectId:    s.id,
-    subjectTitle: s.title,
-    category:     s.category,
-    nodeId:       n.id,
-    nodeTitle:    n.title,
-    nodeHours:    n.hours,
-  }))
-);
+interface FlatNode {
+  subjectId:    string;
+  subjectTitle: string;
+  category:     string;
+  nodeId:       string;
+  nodeTitle:    string;
+  nodeHours:    number;
+}
 
 export default function SchedulePage() {
   const searchParams  = useSearchParams();
@@ -67,6 +72,9 @@ export default function SchedulePage() {
   const [saving,         setSaving]         = useState(false);
   const [saveOk,         setSaveOk]         = useState(false);
   const [error,          setError]          = useState('');
+
+  const [dbSubjects,    setDbSubjects]    = useState<DbSubject[]>([]);
+  const [dbNodes,       setDbNodes]       = useState<DbNode[]>([]);
 
   const [autoStart,    setAutoStart]    = useState('');
   const [autoInterval, setAutoInterval] = useState(7);
@@ -108,6 +116,18 @@ export default function SchedulePage() {
     }
   }, []);
 
+  const fetchCurriculum = useCallback(async (courseId: string) => {
+    if (!courseId) return;
+    try {
+      const res  = await adminFetch(`/api/admin/curriculum?course_id=${courseId}`);
+      const data = await res.json();
+      setDbSubjects(data.subjects ?? []);
+      setDbNodes(data.nodes ?? []);
+    } catch {
+      setError('커리큘럼 정보를 불러오는데 실패했습니다.');
+    }
+  }, []);
+
   const fetchSchedule = useCallback(async (courseId: string) => {
     if (!courseId) return;
     setLoading(true);
@@ -128,11 +148,41 @@ export default function SchedulePage() {
   }, []);
 
   useEffect(() => { fetchCourses(); }, [fetchCourses]);
-  useEffect(() => { if (selectedCourse) fetchSchedule(selectedCourse); }, [selectedCourse, fetchSchedule]);
+  useEffect(() => {
+    if (selectedCourse) {
+      fetchCurriculum(selectedCourse);
+      fetchSchedule(selectedCourse);
+    }
+  }, [selectedCourse, fetchCurriculum, fetchSchedule]);
+
+
+  /* DB 데이터를 화면용 평면 노드 리스트로 변환 (subject 순서 → 노드 순서) */
+  const allNodes = useMemo<FlatNode[]>(() => {
+    const subjectById = new Map(dbSubjects.map(s => [s.id, s]));
+    const sortedNodes = [...dbNodes].sort((a, b) => {
+      const sa = subjectById.get(a.subject_id);
+      const sb = subjectById.get(b.subject_id);
+      if (sa && sb && sa.position !== sb.position) return sa.position - sb.position;
+      return a.position - b.position;
+    });
+    return sortedNodes
+      .filter(n => subjectById.has(n.subject_id))
+      .map(n => {
+        const s = subjectById.get(n.subject_id)!;
+        return {
+          subjectId:    s.slug,
+          subjectTitle: s.title,
+          category:     s.category,
+          nodeId:       n.slug,
+          nodeTitle:    n.title,
+          nodeHours:    n.hours,
+        };
+      });
+  }, [dbSubjects, dbNodes]);
 
   const dirtyCount = useMemo(() =>
     allNodes.filter(n => schedule[n.nodeId] !== savedSchedule[n.nodeId]).length
-  , [schedule, savedSchedule]);
+  , [allNodes, schedule, savedSchedule]);
 
   /* Bulk preview: assign dates sequentially across all nodes */
   const previewDates = useMemo(() => {
@@ -141,7 +191,7 @@ export default function SchedulePage() {
       acc[n.nodeId] = addDays(autoStart, i * autoInterval);
       return acc;
     }, {});
-  }, [autoStart, autoInterval]);
+  }, [allNodes, autoStart, autoInterval]);
 
   function applyBulk() {
     setSchedule(previewDates);
@@ -227,7 +277,7 @@ export default function SchedulePage() {
 
   /* Group nodes by subject for display */
   const groupedNodes = useMemo(() => {
-    const groups: { subjectId: string; subjectTitle: string; category: string; nodes: typeof allNodes }[] = [];
+    const groups: { subjectId: string; subjectTitle: string; category: string; nodes: FlatNode[] }[] = [];
     for (const node of allNodes) {
       const last = groups[groups.length - 1];
       if (last?.subjectId === node.subjectId) {
@@ -237,7 +287,37 @@ export default function SchedulePage() {
       }
     }
     return groups;
-  }, []);
+  }, [allNodes]);
+
+  /* 카테고리별로 묶기 — CATEGORY_ORDER 순서대로 */
+  const categorizedGroups = useMemo(() => {
+    const byCategory: Record<string, typeof groupedNodes> = {};
+    for (const g of groupedNodes) {
+      if (!byCategory[g.category]) byCategory[g.category] = [];
+      byCategory[g.category].push(g);
+    }
+    return CATEGORY_ORDER
+      .map(c => ({ ...c, subjects: byCategory[c.key] ?? [] }))
+      .filter(c => c.subjects.length > 0);
+  }, [groupedNodes]);
+
+  async function handleDeleteCourse() {
+    if (!selectedCourseObj) return;
+    const ok = window.confirm(`"${selectedCourseObj.title}" 과정을 삭제하시겠습니까?\n\n해당 과정에 등록된 수강생, 일정 등 모든 관련 데이터가 함께 삭제됩니다.`);
+    if (!ok) return;
+    setEditSaving(true); setError('');
+    try {
+      const res = await adminFetch('/api/admin/courses', {
+        method: 'DELETE',
+        body: JSON.stringify({ id: selectedCourseObj.id }),
+      });
+      if (!res.ok) throw new Error();
+      window.location.href = '/';
+    } catch {
+      setError('과정 삭제에 실패했습니다.');
+      setEditSaving(false);
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-8 animate-fadeIn">
@@ -357,7 +437,7 @@ export default function SchedulePage() {
             </div>
           </div>
 
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2 pt-1 items-center">
             <button
               onClick={saveEditCourse}
               disabled={editSaving || !editTitle.trim()}
@@ -371,6 +451,14 @@ export default function SchedulePage() {
               className="text-[13px] px-4 py-2 rounded-lg border border-[#d4d0c8] text-[#3a3835] hover:text-[#1a1918] hover:border-[#1a1918] transition-colors"
             >
               취소
+            </button>
+            <span className="flex-1" />
+            <button
+              onClick={handleDeleteCourse}
+              disabled={editSaving}
+              className="text-[12.5px] text-[#b04030] hover:text-[#7a2818] disabled:opacity-40 transition-colors"
+            >
+              과정 삭제
             </button>
           </div>
         </div>
@@ -462,8 +550,24 @@ export default function SchedulePage() {
         </div>
       )}
 
+      {/* ── 빈 커리큘럼 상태: 커리큘럼 관리 페이지로 안내 ── */}
+      {!loading && courses.length > 0 && allNodes.length === 0 && (
+        <div className="border border-[#d4d0c8] rounded-xl py-14 px-6 text-center">
+          <p className="text-[15.5px] font-semibold text-[#1a1918]">이 과정은 아직 커리큘럼이 비어있습니다</p>
+          <p className="text-[13px] text-[#7a766f] mt-2 leading-relaxed">
+            먼저 커리큘럼 관리 페이지에서 과목·노드를 구성한 뒤 일정을 설정할 수 있습니다.
+          </p>
+          <a
+            href={`/admin/curriculum?course_id=${selectedCourse}`}
+            className="mt-6 inline-flex items-center gap-2 text-[13.5px] font-semibold px-5 py-2.5 rounded-lg bg-[#1a1918] text-white hover:bg-[#2d2b29] transition-colors"
+          >
+            커리큘럼 관리로 이동 →
+          </a>
+        </div>
+      )}
+
       {/* ── 노드 목록 (과목별 그룹) ── */}
-      {!loading && courses.length > 0 && (
+      {!loading && courses.length > 0 && allNodes.length > 0 && (
         <>
           {/* 컬럼 헤더 */}
           <div className="grid grid-cols-[1fr_80px_130px] gap-4 px-3 py-2.5 border-b-2 border-[#1a1918]">
@@ -472,10 +576,26 @@ export default function SchedulePage() {
             <span className="text-[12px] font-semibold text-[#3a3835] uppercase tracking-[0.08em] text-center">오픈일</span>
           </div>
 
-          {groupedNodes.map(group => {
-            const isBulk     = subjectBulk === group.subjectId;
-            const isSingle   = group.nodes.length === 1;
-            const categoryLabel = group.category === '정규교과' ? '정규' : group.category;
+          {categorizedGroups.map(cat => {
+            const catNodeCount = cat.subjects.reduce((sum, s) => sum + s.nodes.length, 0);
+            const catHours     = cat.subjects.reduce((sum, s) => sum + s.nodes.reduce((h, n) => h + n.nodeHours, 0), 0);
+            return (
+              <section key={cat.key} className="mt-10 first:mt-6">
+                {/* 카테고리 헤더 */}
+                <div className="px-3 pt-2 pb-3 mb-1 border-b border-[#1a1918] flex items-end justify-between gap-4">
+                  <div>
+                    <h2 className="text-[18px] font-bold text-[#1a1918] tracking-tight">{cat.label}</h2>
+                    <p className="text-[12.5px] text-[#7a766f] mt-0.5">{cat.description}</p>
+                  </div>
+                  <p className="text-[12px] text-[#7a766f] tabular-nums pb-1">
+                    {cat.subjects.length}과목 · {catNodeCount}노드 · {catHours}h
+                  </p>
+                </div>
+
+                {cat.subjects.map(group => {
+                  const isBulk     = subjectBulk === group.subjectId;
+                  const isSingle   = group.nodes.length === 1;
+                  const categoryLabel = group.category === '정규교과' ? '정규' : group.category;
 
             /* ── 1노드 과목: 과목 = 노드, 한 줄로 합침 ── */
             if (isSingle) {
@@ -607,6 +727,9 @@ export default function SchedulePage() {
                   );
                 })}
               </div>
+            );
+                })}
+              </section>
             );
           })}
 

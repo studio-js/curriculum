@@ -6,8 +6,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthContext } from '@/contexts/AuthContext';
 
 const NAV = [
-  { href: '/admin/students', label: '수강생 관리' },
-  { href: '/admin/schedule', label: '수업 일정 설정' },
+  { href: '/admin/students',   label: '수강생 관리'    },
+  { href: '/admin/curriculum', label: '커리큘럼 관리'  },
+  { href: '/admin/schedule',   label: '수업 일정 설정' },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

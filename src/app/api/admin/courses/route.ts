@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient, verifyAdminFromRequest } from '@/lib/supabaseServer';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { curriculumData } from '@/data/curriculum';
 
 function json(body: object, status = 200) {
   return NextResponse.json(body, { status });
@@ -50,14 +51,57 @@ export async function POST(req: Request) {
   }
 
   const admin = createAdminClient();
-  const { data, error } = await admin
+  const { data: course, error } = await admin
     .from('courses')
     .insert({ title, description, start_date, end_date })
     .select()
     .single();
 
-  if (error) return json({ error: '생성에 실패했습니다.' }, 500);
-  return json({ course: data });
+  if (error || !course) return json({ error: '생성에 실패했습니다.' }, 500);
+
+  /* 신규 과정 생성 시 기본 커리큘럼 자동 시드 (실패해도 과정 자체는 생성 OK) */
+  try {
+    const subjectRows = curriculumData.subjects.map((s, idx) => ({
+      course_id:   course.id,
+      slug:        s.id,
+      title:       s.title,
+      category:    s.category,
+      total_hours: s.totalHours,
+      position:    idx,
+    }));
+    const { data: insertedSubjects } = await admin
+      .from('course_subjects')
+      .upsert(subjectRows, { onConflict: 'course_id,slug' })
+      .select('id, slug');
+
+    const subjectMap = new Map((insertedSubjects ?? []).map(s => [s.slug, s.id]));
+    const nodeRows: Array<{
+      course_id: string; subject_id: string; slug: string; title: string;
+      description: string | null; hours: number; position: number;
+    }> = [];
+    for (const s of curriculumData.subjects) {
+      const sid = subjectMap.get(s.id);
+      if (!sid) continue;
+      s.nodes.forEach((n, idx) => {
+        nodeRows.push({
+          course_id:   course.id,
+          subject_id:  sid,
+          slug:        n.id,
+          title:       n.title,
+          description: n.description ?? null,
+          hours:       n.hours,
+          position:    idx,
+        });
+      });
+    }
+    if (nodeRows.length > 0) {
+      await admin.from('course_nodes').upsert(nodeRows, { onConflict: 'course_id,slug' });
+    }
+  } catch {
+    /* 시드 실패는 무시 — 과정은 정상 생성됨, 추후 수동 시드 가능 */
+  }
+
+  return json({ course });
 }
 
 /* 과정 정보 수정 */
